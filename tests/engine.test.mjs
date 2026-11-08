@@ -562,6 +562,8 @@ test('agrandissement case par case : contact, porte-à-faux, largeur 7, glisseme
   assert.equal(extendCheck(s, 2, 3), null); // porte-à-faux permis, comme l'original
   assert.ok(extendCheck(s, 2, 5)); // ne touche aucune pièce de l'étage
   assert.ok(extendCheck(s, 4, 0)); // pas d'étage 3 en dessous
+  assert.ok(extendCheck(s, 3, 3)); // nouvel étage : rien en dessous, la case flotterait
+  assert.equal(extendCheck(s, 3, 0), null); // nouvel étage posé sur une pièce
   assert.ok(extendRoom(s, 3, 1, s.time).ok); // nouvel étage
   // Rez-de-chaussée à droite : la case neuve prend la 1re place, l'accueil reste au bout.
   const r = extendRoom(s, 0, 3, s.time);

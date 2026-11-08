@@ -646,11 +646,15 @@ body:is([data-phase="night"], [data-phase="evening"]) .kind-empty .room-art { fi
 .mood-badge.mood-bad { background: #c0323a; animation: pulseBad 1s infinite; }
 .room-tags .tag.star { padding: 0 4px; }
 
-/* Pastilles d'influence */
+/* Pastilles d'influence (aime / n'aime pas…). Dans une chambre, elles se rangent en
+   haut, sur le mur, sous le numéro et à gauche des badges d'humeur : le bas de la
+   pièce reste au client, qu'elles cachaient. */
 .fx-row {
-  position: absolute; z-index: 5; left: 3px; bottom: 3px; right: 3px;
-  display: flex; flex-wrap: wrap-reverse; gap: 2px; pointer-events: none;
+  position: absolute; z-index: 5; left: 3px; top: 22px; right: 50px;
+  display: flex; flex-wrap: wrap; align-content: flex-start; gap: 2px; pointer-events: none;
 }
+.fx-row:not(.mini) .fx { height: 17px; padding: 0 4px 0 2px; }
+.room:has(.request) .fx-row:not(.mini) { left: 52px; top: 4px; right: 50px; }
 .fx {
   display: inline-flex; align-items: center; gap: 1px; height: 19px; padding: 0 5px 0 3px; border-radius: 999px;
   font-size: 11px; font-weight: 700; line-height: 1; border: 1.5px solid; box-shadow: 0 1px 0 #0005;
@@ -729,9 +733,10 @@ body:is([data-phase="night"], [data-phase="evening"]) .kind-empty .room-art { fi
   100% { transform: translate(-50%, -46px) scale(1); opacity: 0; }
 }
 
-/* Bulles de pensée */
+/* Bulles de pensée : posées dans la pièce du client, sur le mur (et non plus au-dessus,
+   où elles cachaient le client de l'étage supérieur). */
 .thought {
-  position: absolute; transform: translate(-50%, -100%); max-width: 190px; width: max-content;
+  position: absolute; z-index: 8; transform: translate(-50%, 0); max-width: 190px; width: max-content;
   display: flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 18px;
   background: #fff; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.2;
   border: 2.5px solid var(--ink-2); box-shadow: 0 4px 0 #0006;
@@ -745,8 +750,8 @@ body:is([data-phase="night"], [data-phase="evening"]) .kind-empty .room-art { fi
 .thought.pos { border-color: #2fae5f; }
 .thought.neg { border-color: #e0474f; background: #fff6f6; }
 .thought.ask { border-color: #4f8cff; }
-.thought.out { opacity: 0; transform: translate(-50%, -110%); transition: all .45s; }
-@keyframes thoughtIn { from { transform: translate(-50%, -80%) scale(.5); opacity: 0; } }
+.thought.out { opacity: 0; transform: translate(-50%, -12%); transition: all .45s; }
+@keyframes thoughtIn { from { transform: translate(-50%, 10%) scale(.5); opacity: 0; } }
 
 /* File d'attente : profil lisible */
 .qinfo { gap: 3px; }
@@ -1573,9 +1578,4 @@ html, body { overscroll-behavior: none; }
 .or-line { display: flex; align-items: center; gap: 10px; margin: 14px 0 6px; color: var(--ink-2); font-size: 12px; }
 .or-line::before, .or-line::after { content: ''; flex: 1; height: 2px; background: var(--paper-3); border-radius: 2px; }
 
-/* Lien légal (visible, discret) : nom du jeu + règles de confidentialité. */
-.legal-link { position: absolute; z-index: 8; left: 8px; bottom: 6px; padding: 2px 8px; border-radius: 999px;
-  background: #0d103080; color: #ffffffb0; font-size: 10.5px; font-weight: 600; text-decoration: none; }
-.legal-link:hover { color: #fff; background: #0d1030cc; }
-@media (min-width: 900px) { .legal-link { left: 50%; transform: translateX(-50%); } }
 .privacy-row { text-decoration: none; margin-bottom: 6px; }

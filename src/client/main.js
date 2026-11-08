@@ -831,7 +831,7 @@ function renderHint() {
   } else if (selection.mode === 'extend') {
     const cost = extendCost(state);
     html = `<div class="hint-row"><div class="hint-art hint-ico">${icon('build')}</div>
-      <div class="hint-text"><b>Agrandir l'hôtel</b><small>Touchez un emplacement en pointillés : à côté d'une pièce, ou au-dessus du dernier étage (le porte-à-faux est permis). Prochain emplacement : ${cost ? `${cost} 🪙` : 'gratuit'}${Object.keys(state.rooms).length >= CONFIG.extendFameFromRooms ? ', +1 ⭐' : ''}.</small></div>
+      <div class="hint-text"><b>Agrandir l'hôtel</b><small>Touchez un emplacement en pointillés : à côté d'une pièce (le porte-à-faux est permis), ou sur le toit, au-dessus d'une pièce. Prochain emplacement : ${cost ? `${cost} 🪙` : 'gratuit'}${Object.keys(state.rooms).length >= CONFIG.extendFameFromRooms ? ', +1 ⭐' : ''}.</small></div>
       <button class="icon-btn" data-action="cancel" aria-label="Terminer">${icon('check')}</button></div>`;
   } else if (selection.staffId) {
     const s = state.staff.find((x) => x.id === selection.staffId);
@@ -2058,7 +2058,10 @@ function bindUx() {
   $('#scene').addEventListener('wheel', () => closeCtx(), { passive: true });
   window.addEventListener('resize', closeCtx);
   // Bulles d'aide : survol à la souris…
-  document.addEventListener('mouseover', (e) => {
+  // (pointerover filtré sur la souris : au doigt, le navigateur simule un survol
+  // après chaque toucher, ce qui affichait la bulle en plus de l'action du bouton.)
+  document.addEventListener('pointerover', (e) => {
+    if (e.pointerType !== 'mouse') return;
     const el = e.target.closest('[data-hint]');
     clearTimeout(tipTimer);
     if (!el) { $('#tip').hidden = true; return; }

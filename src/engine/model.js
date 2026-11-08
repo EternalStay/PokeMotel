@@ -191,9 +191,9 @@ export const floorCols = (state, f) => Object.values(state.rooms).filter((r) => 
 /**
  * Peut-on ajouter une case en (étage, colonne) ? Renvoie un message d'erreur ou null.
  * Règles de la réécriture : la case touche une case du même étage (ou ouvre un
- * nouvel étage au-dessus du dernier, à n'importe quelle colonne), largeur 7,
- * hauteur 22. Rien n'oblige une case à reposer sur une pièce : le porte-à-faux est
- * permis (le client le dessine soutenu par des consoles).
+ * nouvel étage au-dessus du dernier, posé sur une pièce existante), largeur 7,
+ * hauteur 22. Sur un étage déjà commencé, rien n'oblige une case à reposer sur une
+ * pièce : le porte-à-faux est permis (le client le dessine soutenu par des consoles).
  */
 export function extendCheck(state, floor, col) {
   if (state.rooms[roomId(floor, col)]) return 'Cet emplacement existe déjà.';
@@ -204,6 +204,8 @@ export function extendCheck(state, floor, col) {
   if (widens && span.width >= CONFIG.maxCols) return `Largeur maximale atteinte (${CONFIG.maxCols} colonnes) : agrandissez vers le haut !`;
   const row = floorCols(state, floor);
   if (row.length && !row.includes(col - 1) && !row.includes(col + 1)) return 'La nouvelle pièce doit toucher une pièce du même étage.';
+  // Un nouvel étage démarre forcément posé sur une pièce : pas de case flottant dans le vide.
+  if (!row.length && floor > 0 && !state.rooms[roomId(floor - 1, col)]) return 'Le nouvel étage doit reposer sur une pièce existante.';
   return null;
 }
 
