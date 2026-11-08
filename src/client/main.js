@@ -305,7 +305,7 @@ function popSatisfactionChanges(occ, sats) {
 function maybeThought() {
   if (selection || !$('#sheet').hidden || document.hidden) return;
   if (Date.now() - lastThought < 5500) return;
-  const guests = Object.values(state.guests).filter((g) => g.roomId && frame.details[g.id]);
+  const guests = Object.values(state.guests).filter((g) => g.roomId && !g.leisure && frame.details[g.id]); // pas de bulle dans une chambre vide (client en sortie)
   if (!guests.length) return;
   lastThought = Date.now();
   // On privilégie les clients les plus affectés (en bien ou en mal) et ceux qui ont une demande.
@@ -325,17 +325,11 @@ function showThought(g) {
   const el = document.createElement('div');
   el.className = `thought ${th.tone}`;
   el.innerHTML = `${th.aura ? auraIcon(th.aura) : th.icon ? `<span class="th-emoji">${th.icon}</span>` : ''}<span>${esc(th.text)}</span>`;
+  // Toujours dans la chambre du client : pas plus large qu'elle, centrée sur elle.
   el.style.top = `${box.y + 4}px`;
+  el.style.maxWidth = `${Math.max(60, box.w - 8)}px`;
+  el.style.left = `${box.x + box.w / 2}px`;
   fxLayer().appendChild(el);
-  // Bornée à ce qu'on voit de l'hôtel (la caméra peut zoomer et couper les bords).
-  const b = $('#building');
-  const br = b.getBoundingClientRect();
-  const sr = $('#scene').getBoundingClientRect();
-  const scale = br.width / b.offsetWidth || 1;
-  const half = el.offsetWidth / 2 + 6;
-  const lo = Math.max(half, (sr.left - br.left) / scale + half);
-  const hi = Math.min(b.offsetWidth - half, (sr.right - br.left) / scale - half);
-  el.style.left = `${Math.max(lo, Math.min(hi, box.x + box.w / 2))}px`;
   setTimeout(() => el.classList.add('out'), 3600);
   setTimeout(() => el.remove(), 4100);
 }
@@ -637,7 +631,7 @@ function roomView(room, t, occ, sats) {
   if (g) {
     // Coin haut droit : humeur, nuits, Star.
     html += `<div class="room-tags">${moodBadge(sat)}
-      ${g.nightsLeft <= 0 ? '<span class="tag leave">Départ 10h</span>' : `<span class="tag">${icon('moon')}${g.nightsLeft}</span>`}
+      ${g.nightsLeft <= 0 ? `<span class="tag leave" title="Départ à 10h">${icon('door')}10h</span>` : `<span class="tag">${icon('moon')}${g.nightsLeft}</span>`}
       ${g.star ? `<span class="tag star">${icon('star')}</span>` : ''}
       ${g.parcel ? '<span class="tag egg" title="Œuf d’un ami : ne paie pas">🥚</span>' : ''}
       ${g.bombAt ? `<span class="tag bomb">💥<span data-until="${g.bombAt}"></span></span>` : ''}</div>`;

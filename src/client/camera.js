@@ -21,7 +21,7 @@ export class Camera {
     this.scale = 1;
     this.onChange = onChange || (() => {});
     this.pointers = new Map();
-    this.suppressClick = false;
+    this.suppressUntil = 0; // un clic juste après un glisser / pincement est ignoré
     this.userMoved = false;
     this.bind();
   }
@@ -100,7 +100,7 @@ export class Camera {
         const d = Math.hypot(a.x - b.x, a.y - b.y);
         const target = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.pinch.scale * (d / this.pinch.d)));
         this.zoomAt(target / this.scale, (a.x + b.x) / 2, (a.y + b.y) / 2);
-        this.suppressClick = true;
+        this.suppressUntil = Infinity;
         return;
       }
       const d = this.drag;
@@ -116,7 +116,9 @@ export class Camera {
     });
 
     const end = (e) => {
-      if (this.drag && this.drag.moved) this.suppressClick = true;
+      // Au doigt, le navigateur n'envoie souvent aucun clic après un glisser : on ne bloque
+      // donc que le clic qui suit aussitôt, pas le prochain toucher (ex. un bouton du menu).
+      if ((this.drag && this.drag.moved) || this.suppressUntil === Infinity) this.suppressUntil = performance.now() + 350;
       this.pointers.delete(e.pointerId);
       if (this.pointers.size < 2) this.pinch = null;
       if (!this.pointers.size) { this.drag = null; vp.classList.remove('dragging'); }
@@ -126,7 +128,7 @@ export class Camera {
 
     // Un glisser n'est pas un clic.
     vp.addEventListener('click', (e) => {
-      if (this.suppressClick) { e.stopPropagation(); e.preventDefault(); this.suppressClick = false; }
+      if (performance.now() < this.suppressUntil) { e.stopPropagation(); e.preventDefault(); this.suppressUntil = 0; }
     }, true);
 
     vp.addEventListener('wheel', (e) => {

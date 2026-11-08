@@ -736,17 +736,17 @@ body:is([data-phase="night"], [data-phase="evening"]) .kind-empty .room-art { fi
 /* Bulles de pensée : posées dans la pièce du client, sur le mur (et non plus au-dessus,
    où elles cachaient le client de l'étage supérieur). */
 .thought {
-  position: absolute; z-index: 8; transform: translate(-50%, 0); max-width: 190px; width: max-content;
-  display: flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 18px;
-  background: #fff; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.2;
+  position: absolute; z-index: 8; transform: translate(-50%, 0); max-width: 190px; width: max-content; box-sizing: border-box;
+  display: flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 14px;
+  background: #fff; color: var(--ink); font-size: 11.5px; font-weight: 600; line-height: 1.2;
   border: 2.5px solid var(--ink-2); box-shadow: 0 4px 0 #0006;
   animation: thoughtIn .35s cubic-bezier(.2, .9, .3, 1.4);
 }
 .thought::before, .thought::after { content: ""; position: absolute; left: 50%; border-radius: 50%; background: inherit; border: 2px solid; border-color: inherit; }
 .thought::before { width: 11px; height: 11px; bottom: -13px; transform: translateX(-80%); }
 .thought::after { width: 6px; height: 6px; bottom: -21px; transform: translateX(-20%); }
-.thought .aura-ico { width: 20px; height: 20px; flex-shrink: 0; }
-.th-emoji { font-size: 18px; }
+.thought .aura-ico { width: 16px; height: 16px; flex-shrink: 0; }
+.th-emoji { font-size: 15px; }
 .thought.pos { border-color: #2fae5f; }
 .thought.neg { border-color: #e0474f; background: #fff6f6; }
 .thought.ask { border-color: #4f8cff; }
