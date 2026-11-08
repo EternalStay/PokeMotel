@@ -27,7 +27,7 @@ import { unlockAudio, sfx, setSoundEnabled, soundEnabled, soundForLog, ACTION_SO
 import { Camera } from './camera.js';
 import { treeSVG, bushSVG, benchSVG, chimneysSVG, sconceSVG, planterSVG, ledClockHTML, carSVG, birdsSVG } from './decor.js';
 import {
-  globalDefs, creatureSVG, staffSVG, itemSVG, roomSVG, skySVG, roofSVG, waterTowerSVG, antennaSVG, lobbySVG,
+  globalDefs, creatureSVG, occupantStyle, staffSVG, itemSVG, roomSVG, skySVG, roofSVG, waterTowerSVG, antennaSVG, lobbySVG,
   awningSVG, streetSVG, lampPostSVG, levelStars, citySVG, lobbyCellSVG,
 } from './art.js';
 import { icon, auraIcon, faceIcon, dirIcon, factorIcon } from './icons.js';
@@ -190,12 +190,19 @@ function selectionValid() {
 /** Exécute une action du moteur puis rafraîchit. */
 /** Toutes les actions passent par `dispatch` (comme elles passeront par le serveur). */
 const ACTION_NAMES = new Map(Object.entries(ALL_ACTIONS).map(([k, f]) => [f, k]));
+/** Petite vibration du téléphone (réglable dans le Bureau). */
+function buzz(pattern) {
+  if (!prefs.get('vibrate', true) || !navigator.vibrate || !matchMedia('(pointer: coarse)').matches) return;
+  try { navigator.vibrate(pattern); } catch { /* ignoré */ }
+}
+
 function act(fn, ...args) {
   if (isLocked(now())) { toast('Minuit sonne : le Consortium fait ses comptes. Revenez dans une minute !', 'bad'); return { ok: false }; }
   const name = ACTION_NAMES.get(fn);
   if (!name) throw new Error('Action non déclarée dans ALL_ACTIONS');
   const res = dispatch(state, name, args, now());
   if (!res.ok) { toast(res.error, 'bad'); sfx('error', 2); } else sfx(ACTION_SOUNDS[name] || 'click', 2);
+  buzz(res.ok ? 12 : [30, 50, 30]);
   if (res.ok && online) sendToServer(name, args);
   dirty = true;
   tick();
@@ -210,9 +217,16 @@ function render() {
   if (selection || tray) guardBack(); // un mode en cours (placer, agrandir…) se quitte avec Retour
   const p = phaseOf(t);
   if (p !== phase) {
+    // Fondu enchaîné entre deux ciels (aube, jour, crépuscule, soir, nuit) au lieu d'un saut.
+    const sky = $('#sky');
+    if (phase && sky.firstElementChild) {
+      const old = sky.firstElementChild;
+      old.classList.add('sky-old');
+      sky.insertAdjacentHTML('beforeend', skySVG(p));
+      setTimeout(() => old.remove(), 4200);
+    } else sky.innerHTML = skySVG(p);
     phase = p;
     document.body.dataset.phase = p;
-    $('#sky').innerHTML = skySVG(p);
     layoutKey = ''; // la rue et les lampadaires changent avec la phase
   }
   const occ = occupancy(state);
@@ -249,6 +263,7 @@ function render() {
   renderHint();
   renderActionBar();
   maybeQuestPointer();
+  maybeQuestBanner();
   for (const el of document.querySelectorAll('[data-until]')) el.textContent = fmtCountdown(Number(el.dataset.until) - t);
   popSatisfactionChanges(occ, sats);
 }
@@ -335,8 +350,52 @@ function showThought(g) {
   setTimeout(() => el.remove(), 4100);
 }
 
+let hudPrev = null; // argent / prestige au dernier affichage, pour fêter les gains
+
+/** Pièces qui volent du bâtiment vers le compteur d'argent, et « +N » au-dessus des compteurs. */
+function celebrateGains(dMoney, dFame) {
+  if (document.hidden) return;
+  if (dMoney > 0) {
+    popOver('#money', `+${dMoney.toLocaleString('fr-FR')}`, 'coin');
+    const to = $('#money').closest('.res').getBoundingClientRect();
+    const from = ($('#building') || $('#scene')).getBoundingClientRect();
+    const n = Math.min(8, 2 + Math.floor(dMoney / 20));
+    for (let i = 0; i < n; i++) {
+      const c = document.createElement('div');
+      c.className = 'fly-coin';
+      document.body.appendChild(c);
+      const x0 = from.left + from.width * (0.25 + Math.random() * 0.5);
+      const y0 = from.top + from.height * (0.3 + Math.random() * 0.4);
+      const x1 = to.left + 14;
+      const y1 = to.top + to.height / 2;
+      const a = c.animate([
+        { transform: `translate(${x0}px, ${y0}px) scale(.6)`, opacity: 0 },
+        { transform: `translate(${x0}px, ${y0 - 30}px) scale(1)`, opacity: 1, offset: 0.2 },
+        { transform: `translate(${x1}px, ${y1}px) scale(.7)`, opacity: 1 },
+      ], { duration: 900 + Math.random() * 300, delay: i * 70, easing: 'cubic-bezier(.5, 0, .5, 1)', fill: 'backwards' });
+      a.onfinish = () => c.remove();
+    }
+  }
+  if (dFame > 0) popOver('#prestige', `+${dFame} ⭐`, 'fame');
+}
+
+function popOver(sel, text, cls) {
+  const r = $(sel).closest('.res').getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = `hud-pop ${cls}`;
+  el.textContent = text;
+  el.style.left = `${r.left + r.width / 2}px`;
+  el.style.top = `${r.bottom + 4}px`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1600);
+}
+
 function renderHud(t) {
   const c = clockInfo(state, t);
+  if (hudPrev && performance.now() > 5000 && (state.money > hudPrev.money || state.prestige > hudPrev.fame)) {
+    celebrateGains(state.money - hudPrev.money, state.prestige - hudPrev.fame);
+  }
+  hudPrev = { money: state.money, fame: state.prestige };
   $('#money').textContent = state.money.toLocaleString('fr-FR');
   $('#money').closest('.res').classList.toggle('debt', state.money < 0);
   $('#gems').textContent = (state.gems || 0).toLocaleString('fr-FR');
@@ -623,7 +682,7 @@ function roomView(room, t, occ, sats) {
   if (g && g.leisure) {
     html += `<div class="out-note">${icon('door')}<span>En sortie<br><small>${esc(BUILDABLES[state.rooms[g.leisure.roomId]?.sub]?.name || '')}</small></span></div>`;
   } else if (g) {
-    html += `<div class="occupant ${g.type === 'spectre' ? 'float' : ''}${screaming ? ' shaking' : ''}" style="--d:${(g.look % 9) * 0.37}s">${creatureSVG(g, mood)}</div>`;
+    html += `<div class="occupant walker-in ${g.type === 'spectre' ? 'float' : ''}${screaming ? ' shaking' : ''}" style="${occupantStyle(g)}">${creatureSVG(g, mood)}</div>`;
     if (screaming) html += '<span class="scream">HURLE&nbsp;!</span>';
   }
   if (g) {
@@ -634,7 +693,7 @@ function roomView(room, t, occ, sats) {
       ${g.parcel ? '<span class="tag egg" title="Œuf d’un ami : ne paie pas">🥚</span>' : ''}
       ${g.bombAt ? `<span class="tag bomb">💥<span data-until="${g.bombAt}"></span></span>` : ''}</div>`;
     // Bas : pastilles "ce qui va / ne va pas".
-    if (!selection) html += chipsHTML(detail.lines, { max: 4 });
+    if (!selection) html += chipsHTML(detail.lines, { max: 2 }); // les 2 plus fortes ; le reste dans la bulle et la fiche
     if (g.request) {
       const svc = SERVICES[g.request.kind];
       const st = { ok: icon('check'), busy: icon('clock'), missing: icon('lock') }[reqStatus];
@@ -648,13 +707,14 @@ function roomView(room, t, occ, sats) {
   }
   if (room.buildEnd) html += `<span class="work-timer big">${icon('hammer')}<span data-until="${room.buildEnd}"></span></span>`;
   if (busy) html += `<span class="work-timer">${icon('clock')}<span data-until="${room.busyUntil}"></span></span>`;
+  if (room.kind === 'empty' && !room.buildEnd) html += SITE_DECO;
   if (room.kind === 'empty' && !room.buildEnd && !selection) html += `<span class="build-cta">${icon('build')}Construire</span>`;
   if (room.kind !== 'empty' && room.kind !== 'bedroom' && !room.buildEnd) {
     const b = BUILDABLES[room.sub];
     html += `<span class="room-sign">${b.aura ? auraIcon(b.aura) : ''}${esc(b.name)}</span>`;
   }
   if (room.damage && !g && !staff) html += `<span class="build-cta warn">${icon('wrench')}Abîmée ×${room.damage}</span>`;
-  if (visitor) html += `<div class="occupant visitor" style="--d:${(visitor.look % 9) * 0.37}s">${creatureSVG(visitor, 'good')}</div>`;
+  if (visitor) html += `<div class="occupant visitor" style="${occupantStyle(visitor)}">${creatureSVG(visitor, 'good')}</div>`;
   if (room.leftItem) html += `<span class="pickup-hint${room.leftItem.vials ? ' vial' : ''}">${room.leftItem.vials ? '🧪' : icon('pickup')}</span>`;
   if (room.kind === 'bedroom' && !g && room.equip.length && !selection) {
     html += `<div class="equip-badges">${room.equip.map((id) => (ITEMS[id].auras.length ? ITEMS[id].auras.map((a) => auraIcon(a)).join('') : `<span class="eq-dot">${icon('box')}</span>`)).join('')}</div>`;
@@ -685,6 +745,17 @@ function roomView(room, t, occ, sats) {
  * Mobilier d'une case : chaque meuble est posé sur l'étage (x en colonnes) ; la
  * case en dessine la part qui la touche (un meuble à cheval passe derrière le mur).
  */
+/** Emplacement libre : petit décor de chantier (barrière rayée, plots, seau). */
+const SITE_DECO = `<svg class="site-deco" viewBox="0 0 120 40" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+  <g stroke="#3a2a1a" stroke-width="1.5" stroke-linejoin="round">
+    <rect x="30" y="8" width="60" height="9" rx="1.5" fill="#fff"/>
+    <path d="M36 8 l-6 9 M48 8 l-6 9 M60 8 l-6 9 M72 8 l-6 9 M84 8 l-6 9 M90 10 l-4 7" stroke="#e8463a" stroke-width="4"/>
+    <rect x="30" y="8" width="60" height="9" rx="1.5" fill="none"/>
+    <path d="M36 17 v20 M84 17 v20 M32 37 h8 M80 37 h8"/>
+    <path d="M10 37 l5 -18 h4 l5 18z" fill="#ff8a1e"/><path d="M12.5 30 h9 M14 24 h6" stroke="#fff" stroke-width="2.4"/>
+    <path d="M96 37 l5 -18 h4 l5 18z" fill="#ff8a1e"/><path d="M98.5 30 h9 M100 24 h6" stroke="#fff" stroke-width="2.4"/>
+  </g></svg>`;
+
 function decoLayerHTML(pieces, col) {
   if (!pieces.length) return '';
   const decoMode = selection && selection.mode === 'deco';
@@ -1043,6 +1114,9 @@ let sheetActions = [];
 
 function openSheet({ title, kicker = '', body, actions = [], cls = '', hero = '' }) {
   closeCtx();
+  // Bannière de mission encore affichée : on la cache, elle reviendra une fois la fenêtre fermée.
+  const qb = $('#quest-banner');
+  if (qb && !qb.hidden) { qb.hidden = true; prefs.set('bannerQuest', ''); }
   hidePointer();
   const sheet = $('#sheet');
   sheetActions = actions;
@@ -1066,7 +1140,20 @@ function openSheet({ title, kicker = '', body, actions = [], cls = '', hero = ''
 }
 
 function closeSheet() {
-  $('#sheet').hidden = true;
+  const sheet = $('#sheet');
+  if (!sheet.hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // La fenêtre est fermée tout de suite (pour le reste du jeu) ; une copie inerte glisse vers le bas.
+    const ghost = sheet.cloneNode(true);
+    ghost.removeAttribute('id');
+    ghost.classList.add('sheet-ghost');
+    ghost.setAttribute('aria-hidden', 'true');
+    const bd = $('#sheet-backdrop').cloneNode(false);
+    bd.removeAttribute('id');
+    bd.classList.add('sheet-ghost');
+    document.body.append(bd, ghost);
+    setTimeout(() => { ghost.remove(); bd.remove(); }, 230);
+  }
+  sheet.hidden = true;
   $('#sheet-backdrop').hidden = true;
 }
 
@@ -1575,6 +1662,7 @@ function openOffice({ keep = false } = {}) {
       ${accountHTML()}
       <a class="set-row privacy-row" href="confidentialite.html" target="_blank" rel="noopener"><small>Vos données</small><b>🔒 Règles de confidentialité</b>${icon('right')}</a>
       <button class="set-row sound-row" data-do="sound"><small>Sons du jeu</small><b>${soundEnabled() ? '🔊 Activés' : '🔇 Coupés'}</b>${icon('right')}</button>
+      <button class="set-row sound-row" data-do="vibrate"><small>Vibrations</small><b>${prefs.get('vibrate', true) ? '📳 Activées' : '📴 Coupées'}</b>${icon('right')}</button>
       <button class="set-row sound-row" data-do="reload"><small>Un souci d’affichage ?</small><b>🔄 Recharger le jeu</b>${icon('right')}</button>
       ${restartHTML()}
       <h3>${icon('bell')} Publicité du jour</h3>
@@ -1612,6 +1700,7 @@ function openOffice({ keep = false } = {}) {
     sound: () => { rememberOffice(); const on = !soundEnabled(); setSoundEnabled(on); prefs.set('sound', on); if (on) sfx('done', 3); backToOffice(); },
     neon: (i) => { rememberOffice(); if (act(setNeon, Number(i)).ok) backToOffice(); },
     reload: () => location.reload(),
+    vibrate: () => { rememberOffice(); const on = !prefs.get('vibrate', true); prefs.set('vibrate', on); if (on) buzz(20); backToOffice(); },
     goals: openAchievements,
     legacy: () => confirmSheet('Léguer votre hôtel ?', `Vous repartirez au niveau ${LEGACY.restartLevel} avec l'accueil seul. Vous gardez votre argent (+${LEGACY.compensation} 🪙), 1 employé et votre réserve ; les chambres, les clients, le mobilier et l'arbre de talents sont perdus. En échange : une étoile, +${LEGACY.fame} ⭐ et 5 points de talents de plus au maximum.`, () => act(bequeathHotel)),
   });
@@ -1828,8 +1917,8 @@ function ctxContent(room) {
       <span class="ctx-av">${creatureSVG(g, moodOf(sat))}</span>
       <span class="ctx-id"><b>${esc(g.name)}${g.star ? ` ${icon('star')}` : ''}${g.parcel ? ' 🥚' : ''}</b>
         <small>${ty.name} · ${g.nightsLeft <= 0 ? 'part à 10h' : `${g.nightsLeft} nuit${g.nightsLeft > 1 ? 's' : ''}`}${g.leisure ? ' · en sortie' : ''}</small>
-        <span class="ctx-likes">${g.likes.map((a) => `<i class="like" title="Aime">${icon('heart')}${auraIcon(a)}<b>${AURAS[a].name}</b></i>`).join('')}${g.dislikes.map((a) => `<i class="dislike" title="Déteste">${icon('close')}${auraIcon(a)}<b>${AURAS[a].name}</b></i>`).join('')}</span></span>
-      ${moodBadge(sat)}</div>`;
+        <span class="ctx-likes">${g.likes.map((a) => `<i class="like" title="Aime">${auraIcon(a)}<b>${AURAS[a].name}</b></i>`).join('')}${g.dislikes.map((a) => `<i class="dislike" title="Déteste">${auraIcon(a)}<b>${AURAS[a].name}</b></i>`).join('')}</span></span>
+      ${moodBadge(sat)}</div>${g.leisure ? '' : ctxSummary(computeSatisfaction(state, g))}`;
     if (g.request) A.push({ ico: SERVICES[g.request.kind].icon, raw: true, label: 'Servir', cls: 'primary', run: () => act(fulfillRequest, g.id) });
     if (!g.cared && g.nightsLeft > 0) A.push({ ico: 'heart', label: 'Chouchouter', sub: cur(careCost(state)), disabled: !free || !!staff, why: !free ? 'Aucun employé libre' : '', run: () => act(assignStaff, free.id, room.id) });
     const gift = ITEM_IDS.filter((i) => ITEMS[i].kind === 'gift' && state.inventory[i] > 0).at(-1);
@@ -1864,6 +1953,28 @@ function ctxContent(room) {
     A.push({ ico: 'scroll', label: 'Détails', run: () => openFacility(room) });
   }
   return { head, actions: A };
+}
+
+/** Une ligne qui explique la note : « 3 de base +2 Compagnie −3 sans Chaleur… ». */
+function ctxSummary(detail) {
+  const base = detail.lines.find((l) => l.kind === 'base');
+  const name = (l) => (l.aura ? AURAS[l.aura].name : '');
+  const short = (l) => {
+    if (l.kind === 'missing') return `sans ${name(l)}`;
+    if (l.kind === 'absent') return `pas de ${name(l)}`;
+    if (l.kind === 'aura' || l.kind === 'equip') return name(l);
+    return l.label;
+  };
+  // Les effets identiques (deux voisins qui tiennent compagnie…) sont regroupés : « +4 Compagnie ×2 ».
+  const groups = new Map();
+  for (const l of significant(detail.lines)) {
+    const k = `${short(l)}|${l.value > 0}`;
+    const g = groups.get(k) || { text: short(l), value: 0, n: 0 };
+    g.value += l.value; g.n += 1;
+    groups.set(k, g);
+  }
+  const parts = [...groups.values()].map((g) => `<span class="${g.value > 0 ? 'pos' : 'neg'}"><b>${g.value > 0 ? '+' : '−'}${Math.abs(g.value)}</b> ${esc(g.text)}${g.n > 1 ? ` ×${g.n}` : ''}</span>`);
+  return `<p class="ctx-sum"><span><b>${base ? base.value : 0}</b> de base</span>${parts.join('')}</p>`;
 }
 
 function openCtx(id) {
@@ -2026,6 +2137,26 @@ function questTarget() {
     if (el && el.getClientRects().length) return el;
   }
   return null;
+}
+
+/** Nouvelle mission : son texte s'affiche quelques secondes sous la barre du haut. */
+function maybeQuestBanner() {
+  const qid = `${state.quest.id}:${state.questsDone}`;
+  if (prefs.get('bannerQuest', '') === qid) return;
+  if (!$('#sheet').hidden || (state.notices && state.notices.length)) return; // pas sous une fenêtre
+  prefs.set('bannerQuest', qid);
+  let b = $('#quest-banner');
+  if (!b) {
+    b = document.createElement('button');
+    b.id = 'quest-banner';
+    b.className = 'quest-banner';
+    b.addEventListener('click', () => { b.hidden = true; openQuest(); });
+    $('#scene').appendChild(b);
+  }
+  b.innerHTML = `${factorIcon({ kind: 'quest' })}<span><small>Nouvelle mission</small>${esc(QUESTS[state.quest.id].text)}</span>`;
+  b.hidden = false;
+  clearTimeout(b._t);
+  b._t = setTimeout(() => { b.hidden = true; }, 7000);
 }
 
 let pointer = null; // { until, quest }

@@ -102,8 +102,28 @@ export function globalDefs() {
  * @param {{type: string, look?: number, star?: boolean}} g
  * @param {'good'|'mid'|'bad'} mood
  */
+/**
+ * Décalage d'animation propre à chaque Pokémon (0 à 1), tiré de son identifiant :
+ * deux Pokémon au même dessin ne bougent plus en même temps.
+ */
+export function animPhase(g) {
+  const key = `${g.id || ''}:${g.look || 0}`;
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619);
+  return ((h >>> 0) % 10007) / 10007;
+}
+
+/** Style d'un occupant : décalage du rebond, et petite balade gauche-droite dans sa chambre. */
+export function occupantStyle(g) {
+  const p = animPhase(g);
+  const dur = 16 + Math.round(p * 12); // 16 à 28 s pour un aller-retour
+  return `--d:${(-p * 2.6).toFixed(2)}s;--wd:${dur}s;--wdl:${(-p * dur).toFixed(1)}s;--wx:${(18 + Math.round(p * 16))}%`;
+}
+
 export function creatureSVG(g, mood = 'good', extraClass = '') {
-  const sprite = spriteSVG(g.type, g.look || 0, extraClass, ((g.look || 0) % 8) * 0.5);
+  // Le décalage suit l'horloge : un Pokémon redessiné reprend là où il en était,
+  // et chacun a sa propre phase.
+  const sprite = spriteSVG(g.type, g.look || 0, extraClass, animPhase(g) * 60 + Date.now() / 1000);
   if (sprite) return sprite;
   const t = TYPES[g.type];
   const look = g.look || 0;

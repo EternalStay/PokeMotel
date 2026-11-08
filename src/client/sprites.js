@@ -91,6 +91,6 @@ export function spriteSVG(type, look = 0, extraClass = '', delay = 0) {
   return `<svg class="creature sprite ${extraClass}" viewBox="0 0 64 64" aria-hidden="true">
     <svg width="64" height="64" viewBox="${s.frames[0]}" preserveAspectRatio="xMidYMax meet">
       <image href="${s.src}" width="${s.w}" height="${s.h}"${s.pixel ? ' style="image-rendering:pixelated"' : ''}/>
-      <animate attributeName="viewBox" values="${s.frames.join(';')}" dur="${dur}s" begin="${-delay}s" calcMode="discrete" repeatCount="indefinite"/>
+      <animate attributeName="viewBox" values="${s.frames.join(';')}" dur="${dur}s" begin="${-(delay % dur).toFixed(2)}s" calcMode="discrete" repeatCount="indefinite"/>
     </svg></svg>`;
 }
