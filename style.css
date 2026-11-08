@@ -1578,3 +1578,4 @@ html, body { overscroll-behavior: none; }
   background: #0d103080; color: #ffffffb0; font-size: 10.5px; font-weight: 600; text-decoration: none; }
 .legal-link:hover { color: #fff; background: #0d1030cc; }
 @media (min-width: 900px) { .legal-link { left: 50%; transform: translateX(-50%); } }
+.privacy-row { text-decoration: none; margin-bottom: 6px; }

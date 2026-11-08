@@ -1541,6 +1541,7 @@ function openOffice() {
       </div>
       <p class="muted">On agrandit case par case : à côté d'une pièce, ou au-dessus du dernier étage. Les 9 premiers emplacements sont gratuits, puis le prix augmente avec la taille de l'hôtel. Au-delà de 9 pièces, chaque emplacement rapporte 1 ⭐.</p>
       ${accountHTML()}
+      <a class="set-row privacy-row" href="confidentialite.html" target="_blank" rel="noopener"><small>Vos données</small><b>🔒 Règles de confidentialité</b>${icon('right')}</a>
       <button class="set-row sound-row" data-do="sound"><small>Sons du jeu</small><b>${soundEnabled() ? '🔊 Activés' : '🔇 Coupés'}</b>${icon('right')}</button>
       ${restartHTML()}
       <h3>${icon('bell')} Publicité du jour</h3>
