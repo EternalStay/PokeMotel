@@ -22,6 +22,7 @@ import {
 } from '../engine/index.js';
 import { LocalStore, prefs } from './storage.js';
 import { loadSprites } from './sprites.js';
+import { currentSession, onAuthChange, signIn, signUp, signInGoogle, signOut, callServer, SUPABASE_URL } from './online.js';
 import { unlockAudio, sfx, setSoundEnabled, soundEnabled, soundForLog, ACTION_SOUNDS } from './sound.js';
 import { Camera } from './camera.js';
 import { treeSVG, bushSVG, benchSVG, chimneysSVG, sconceSVG, planterSVG, ledClockHTML, carSVG, birdsSVG } from './decor.js';
@@ -52,6 +53,10 @@ const prevSats = new Map();
 let lastThought = 0;
 let thoughtSeed = 0;
 let soundSeq = 0;
+/** Jeu en ligne : { userId, email } quand le joueur est connecté (le serveur fait foi). */
+let online = null;
+let serverQueue = Promise.resolve();
+let pendingCalls = 0;
 /** Détails de satisfaction et aperçus calculés au dernier rendu. */
 let frame = { details: {}, previews: new Map(), best: new Set() };
 let camera = null;
@@ -115,6 +120,10 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
   if (DEV) renderDevBar();
   // Planches de sprites (essai) : on redessine tout dès qu'une planche est chargée.
+
+  initOnline();
+  setInterval(() => syncFromServer(), 2 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromServer(); });
 
   if (lastSeenLog === 0) openHelp();
   else if (state.stats.nights > nightsBefore) openJournal('Pendant votre absence', lastSeenLog);
@@ -187,6 +196,7 @@ function act(fn, ...args) {
   if (!name) throw new Error('Action non déclarée dans ALL_ACTIONS');
   const res = dispatch(state, name, args, now());
   if (!res.ok) { toast(res.error, 'bad'); sfx('error', 2); } else sfx(ACTION_SOUNDS[name] || 'click', 2);
+  if (res.ok && online) sendToServer(name, args);
   dirty = true;
   tick();
   return res;
@@ -1530,6 +1540,7 @@ function openOffice() {
         <button class="ext-card" data-do="extend" ${!canExtend || state.money < ext ? 'disabled' : ''}>${icon('build')}<b>Ajouter un emplacement</b><small>${h.floors} / ${CONFIG.maxFloors} étages · ${h.cols} / ${CONFIG.maxCols} colonnes</small>${ext ? cur(ext) : '<small>Gratuit</small>'}</button>
       </div>
       <p class="muted">On agrandit case par case : à côté d'une pièce, ou au-dessus du dernier étage. Les 9 premiers emplacements sont gratuits, puis le prix augmente avec la taille de l'hôtel. Au-delà de 9 pièces, chaque emplacement rapporte 1 ⭐.</p>
+      ${accountHTML()}
       <button class="set-row sound-row" data-do="sound"><small>Sons du jeu</small><b>${soundEnabled() ? '🔊 Activés' : '🔇 Coupés'}</b>${icon('right')}</button>
       ${restartHTML()}
       <h3>${icon('bell')} Publicité du jour</h3>
@@ -1563,6 +1574,8 @@ function openOffice() {
       `Votre hôtel actuel sera définitivement perdu. ${custom === '1' ? `Vous repartirez avec l’accueil seul et ${CUSTOM_START_MONEY} ${CURRENCY} pour bâtir vous-même vos pièces.` : 'Vous repartirez avec un hôtel neuf de 6 chambres.'} Vos gemmes vous suivent.`, () => resetGame(custom === '1')),
     rename: openRename,
     manager: openManager,
+    login: openLogin,
+    logout: () => confirmSheet('Se déconnecter ?', 'Votre hôtel reste enregistré sur votre compte. Sur cet appareil, vous repartirez d’une partie locale.', () => signOut()),
     sound: () => { const on = !soundEnabled(); setSoundEnabled(on); prefs.set('sound', on); if (on) sfx('done', 3); openOffice(); },
     neon: (i) => { if (act(setNeon, Number(i)).ok) openOffice(); },
     goals: openAchievements,
@@ -2063,6 +2076,143 @@ function bindUx() {
   document.addEventListener('click', (e) => { if (longPressed && e.target.closest('[data-hint]')) { e.stopPropagation(); e.preventDefault(); } }, true);
 }
 
+// -----------------------------------------------------------------------------
+// Jeu en ligne : le serveur (Supabase) fait foi. Chaque action est calculée tout
+// de suite en local (pour la réactivité), puis envoyée au serveur, dont l'état
+// remplace le nôtre quand plus rien n'est en route.
+// -----------------------------------------------------------------------------
+const AUTH_KEY = `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`;
+let authListening = false;
+
+async function listenAuth() {
+  if (authListening) return;
+  authListening = true;
+  await onAuthChange((event, session) => {
+    if (session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && (!online || online.userId !== session.user.id)) goOnline(session);
+    if (event === 'SIGNED_OUT' && online) goOffline();
+  });
+}
+
+/** Au démarrage : seulement si une session existe (ou au retour d'une connexion Google). */
+async function initOnline() {
+  let hasToken = false;
+  try { hasToken = !!localStorage.getItem(AUTH_KEY); } catch { /* stockage indisponible */ }
+  if (!hasToken && !location.search.includes('code=')) return;
+  try {
+    await listenAuth();
+    const session = await currentSession();
+    if (session && !online) await goOnline(session);
+  } catch { /* hors ligne : on reste en local */ }
+}
+
+let connecting = false;
+async function goOnline(session) {
+  if (connecting) return;
+  connecting = true;
+  try { await connect(session); } finally { connecting = false; }
+}
+
+async function connect(session) {
+  const owner = prefs.get('owner', '');
+  // Première connexion depuis une partie locale : elle est reprise sur le compte
+  // (le serveur l'ignore si le compte a déjà un hôtel). Jamais celle d'un autre compte.
+  const body = owner ? { op: 'load' } : { op: 'import', state };
+  const res = await callServer(body);
+  if (!res.state) { toast(res.error || 'Serveur injoignable : vous jouez en local.', 'bad'); return; }
+  online = { userId: session.user.id, email: session.user.email || 'compte Google' };
+  prefs.set('owner', online.userId);
+  timeOffset = 0;
+  prefs.set('timeOffset', 0);
+  adoptServerState(res.state, true);
+  toast(`Connecté : ${online.email}. Votre hôtel est enregistré en ligne.`, 'good');
+  if (!$('#sheet').hidden && $('#lg-mail')) closeSheet();
+}
+
+async function goOffline() {
+  online = null;
+  prefs.set('owner', '');
+  await store.reset();
+  state = createState(now());
+  adoptLocal();
+  toast('Déconnecté : partie locale.', 'info');
+  closeSheet();
+}
+
+/** Remplace l'état par celui du serveur. Les fenêtres déjà montrées en local ne reviennent pas. */
+function adoptServerState(s, fresh = false) {
+  if (!fresh) s.notices = state.notices;
+  state = s;
+  adoptLocal();
+}
+
+function adoptLocal() {
+  if (!selectionValid()) selection = null;
+  layoutKey = '';
+  roomKeys.clear();
+  soundSeq = state.logSeq;
+  dirty = true;
+  tick();
+}
+
+function sendToServer(name, args) {
+  pendingCalls++;
+  serverQueue = serverQueue.then(async () => {
+    const res = await callServer({ op: 'act', name, args, clearNotices: true });
+    pendingCalls--;
+    if (!online) return;
+    if (!res.state) { toast(res.offline ? 'Connexion perdue : cette action n’a pas été enregistrée.' : res.error, 'bad'); return; }
+    if (!res.ok) toast(`Le serveur a refusé : ${res.error}`, 'bad');
+    if (pendingCalls === 0) adoptServerState(res.state);
+  });
+}
+
+async function syncFromServer() {
+  if (!online || pendingCalls) return;
+  const res = await callServer({ op: 'load', clearNotices: true });
+  if (online && res.state && !pendingCalls) adoptServerState(res.state);
+}
+
+function accountHTML() {
+  if (online) {
+    return `<div class="set-row account-row"><small>Compte en ligne</small><b>${esc(online.email)}</b>
+      <button class="btn small ghost" data-do="logout">Se déconnecter</button></div>`;
+  }
+  return `<button class="set-row account-row" data-do="login"><small>Partie locale (cet appareil seulement)</small><b>☁️ Jouer en ligne</b>${icon('right')}</button>`;
+}
+
+function openLogin() {
+  openSheet({
+    title: 'Jouer en ligne',
+    kicker: 'Compte',
+    body: `<p class="muted">Votre hôtel est enregistré sur votre compte et vous suit sur tous vos appareils. Votre partie actuelle est reprise si le compte n’a pas encore d’hôtel.</p>
+      <button class="btn google-btn" data-do="google"><span class="g-logo">G</span> Continuer avec Google</button>
+      <div class="or-line"><span>ou par e-mail</span></div>
+      <label class="field"><span>E-mail</span><input id="lg-mail" type="email" autocomplete="email" inputmode="email"></label>
+      <label class="field"><span>Mot de passe (6 caractères minimum)</span><input id="lg-pass" type="password" autocomplete="current-password" minlength="6"></label>`,
+    actions: [
+      { label: 'Se connecter', cls: 'primary', run: () => doAuth('in') },
+      { label: 'Créer un compte', run: () => doAuth('up') },
+    ],
+  });
+  onSheetClick({ google: async () => { await listenAuth(); const r = await signInGoogle(); if (!r.ok) toast(r.error, 'bad'); } });
+  setTimeout(() => $('#lg-mail')?.focus(), 60);
+}
+
+async function doAuth(kind) {
+  const email = $('#lg-mail').value.trim();
+  const password = $('#lg-pass').value;
+  if (!email || password.length < 6) { toast('Indiquez un e-mail et un mot de passe de 6 caractères minimum.', 'bad'); return; }
+  await listenAuth();
+  const r = kind === 'in' ? await signIn(email, password) : await signUp(email, password);
+  if (!r.ok) { toast(r.error, 'bad'); return; }
+  if (r.needsConfirm) {
+    openSheet({ title: 'Vérifiez vos e-mails', body: `<p>Un lien de confirmation a été envoyé à <b>${esc(email)}</b>. Ouvrez-le pour activer votre compte : vous reviendrez ici, connecté.</p>`,
+      actions: [{ label: 'Compris', cls: 'primary', run: closeSheet }] });
+    return;
+  }
+  closeSheet();
+}
+
 let toastTimer = null;
 function toast(text, kind = 'info') {
   const el = $('#toast');
@@ -2087,6 +2237,7 @@ function renderDevBar() {
   bar.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b) return;
+    if (online) { toast('Mode test indisponible en ligne : c’est l’horloge du serveur qui compte.', 'bad'); return; }
     if (b.dataset.dt) timeOffset += Number(b.dataset.dt);
     if (b.dataset.to !== undefined) timeOffset += nextLocalHour(now(), Number(b.dataset.to), CONFIG.timeZone) + 1000 - now();
     if (b.dataset.money !== undefined) { state.money += 1000; dirty = true; }

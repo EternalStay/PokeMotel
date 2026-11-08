@@ -2,7 +2,7 @@
 // Service worker : met en cache l'application (et les polices) pour qu'elle
 // s'ouvre hors-ligne. Pensez à incrémenter VERSION à chaque mise à jour.
 // =============================================================================
-const VERSION = 'pokemotel-v0.10.1';
+const VERSION = 'pokemotel-v0.11.0';
 
 const APP_SHELL = [
   './',
@@ -22,6 +22,7 @@ const APP_SHELL = [
   './src/client/furniture.js',
   './src/client/sprites.js',
   './src/client/sound.js',
+  './src/client/online.js',
   './src/engine/index.js',
   './src/engine/data.js',
   './src/engine/rng.js',

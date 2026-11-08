@@ -1,0 +1,7 @@
+# Configuration Supabase (ligne de commande). Projet : biwenlmxtabconpkblke.
+project_id = "pokemotel"
+
+[functions.act]
+# La fonction vérifie elle-même le joueur (auth.getUser) : compatible avec les
+# nouvelles clés d'API et les jetons signés par clés asymétriques.
+verify_jwt = false
