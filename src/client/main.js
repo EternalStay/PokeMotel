@@ -1096,8 +1096,8 @@ function openGuest(guestId) {
 
   const facts = `
     <div class="fact-grid">
-      <div class="fact like"><small>Aime</small><b>${g.likes.length ? g.likes.map((a) => `${auraIcon(a)} ${AURAS[a].name}`).join(' ') : 'rien de spécial'}</b></div>
-      <div class="fact dislike"><small>Déteste</small><b>${g.dislikes.length ? g.dislikes.map((a) => `${auraIcon(a)} ${AURAS[a].name}`).join(' ') : 'rien de spécial'}</b></div>
+      <div class="fact like"><small>Aime</small>${g.likes.length ? g.likes.map((a) => `<b>${auraIcon(a)} ${AURAS[a].name}</b>`).join('') : '<b>rien de spécial</b>'}</div>
+      <div class="fact dislike"><small>Déteste</small>${g.dislikes.length ? g.dislikes.map((a) => `<b>${auraIcon(a)} ${AURAS[a].name}</b>`).join('') : '<b>rien de spécial</b>'}</div>
       <div class="fact"><small>Dégage autour de lui</small><b>${t.auras.length ? t.auras.map((a) => `${auraIcon(a)} ${AURAS[a].name}`).join(' ') : 'rien'}</b></div>
       <div class="fact"><small>Séjour</small><b>${g.roomId ? `${g.nightsLeft} / ${g.stay} nuit(s)` : `${g.stay} nuit(s)`}</b></div>
     </div>
@@ -1828,7 +1828,7 @@ function ctxContent(room) {
       <span class="ctx-av">${creatureSVG(g, moodOf(sat))}</span>
       <span class="ctx-id"><b>${esc(g.name)}${g.star ? ` ${icon('star')}` : ''}${g.parcel ? ' 🥚' : ''}</b>
         <small>${ty.name} · ${g.nightsLeft <= 0 ? 'part à 10h' : `${g.nightsLeft} nuit${g.nightsLeft > 1 ? 's' : ''}`}${g.leisure ? ' · en sortie' : ''}</small>
-        <span class="ctx-likes">${g.likes.map((a) => `<i class="like">${auraIcon(a)}</i>`).join('')}${g.dislikes.map((a) => `<i class="dislike">${auraIcon(a)}</i>`).join('')}</span></span>
+        <span class="ctx-likes">${g.likes.map((a) => `<i class="like" title="Aime">${icon('heart')}${auraIcon(a)}<b>${AURAS[a].name}</b></i>`).join('')}${g.dislikes.map((a) => `<i class="dislike" title="Déteste">${icon('close')}${auraIcon(a)}<b>${AURAS[a].name}</b></i>`).join('')}</span></span>
       ${moodBadge(sat)}</div>`;
     if (g.request) A.push({ ico: SERVICES[g.request.kind].icon, raw: true, label: 'Servir', cls: 'primary', run: () => act(fulfillRequest, g.id) });
     if (!g.cared && g.nightsLeft > 0) A.push({ ico: 'heart', label: 'Chouchouter', sub: cur(careCost(state)), disabled: !free || !!staff, why: !free ? 'Aucun employé libre' : '', run: () => act(assignStaff, free.id, room.id) });
