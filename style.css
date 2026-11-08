@@ -1555,3 +1555,11 @@ html, body { overscroll-behavior: none; }
 /* Case en porte-à-faux (rien en dessous, comme l'original le permet) : soutenue par des consoles. */
 .corbels { position: absolute; z-index: 0; left: 6px; right: 6px; top: 100%; height: 48px; pointer-events: none; }
 .corbels svg { display: block; width: 100%; height: 100%; }
+
+/* Bandeau du haut sans le nom de l'hôtel (déjà sur l'enseigne) : l'heure à gauche, les ressources à droite. */
+.hud-res { flex: 1; }
+.hud-res .clock-chip { margin-right: auto; }
+@media (max-width: 420px) { .res.clock-chip .ico { display: inline-block; } }
+/* Le nom n'est plus que sur l'enseigne : jamais tronqué (sa taille s'adapte à sa longueur). */
+.neon .sign-name { overflow: visible; text-overflow: clip; }
+.sound-row { margin-bottom: 4px; }

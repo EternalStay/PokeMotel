@@ -114,6 +114,9 @@ Le mode `?dev` ajoute un bouton **⏩ DEV** : +10 min, +1h, minuit, 10h, 8h, +10
   directes : servir, chouchouter, offrir, déménager, étudier, réparer, améliorer, construire…) ; barre
   d'actions sur la scène (Agrandir, Mobilier, réserve par rayons : on arme un objet puis on touche la
   pièce) ; bulles d'aide au survol ou à l'appui long ; flèche « Nouvelle mission » ; mode paysage.
+- **Sons** : synthétisés par le navigateur (aucun fichier) : clics, sonnette d'arrivée, pièces, chantier, fin de
+  travaux, paie de minuit, missions, niveau, explosion. Un seul son à la fois ; rien pendant le rattrapage d'une
+  absence. Interrupteur dans le Bureau (mémorisé).
 - **Sprites (essai)** : une planche `assets/sprites/<type>.png` (ou des variantes `<type>1.png`, `<type>2.png`…,
   une au hasard par créature) remplace le dessin SVG de ce type par une
   animation de 8 images (voir `assets/sprites/LISEZMOI.md`).

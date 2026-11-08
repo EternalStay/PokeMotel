@@ -22,6 +22,7 @@ import {
 } from '../engine/index.js';
 import { LocalStore, prefs } from './storage.js';
 import { loadSprites } from './sprites.js';
+import { unlockAudio, sfx, setSoundEnabled, soundEnabled, soundForLog, ACTION_SOUNDS } from './sound.js';
 import { Camera } from './camera.js';
 import { treeSVG, bushSVG, benchSVG, chimneysSVG, sconceSVG, planterSVG, ledClockHTML, carSVG, birdsSVG } from './decor.js';
 import {
@@ -50,6 +51,7 @@ const roomKeys = new Map();
 const prevSats = new Map();
 let lastThought = 0;
 let thoughtSeed = 0;
+let soundSeq = 0;
 /** Détails de satisfaction et aperçus calculés au dernier rendu. */
 let frame = { details: {}, previews: new Map(), best: new Set() };
 let camera = null;
@@ -60,7 +62,6 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const cur = (n) => `<span class="price">${icon('coin')}${Number(n).toLocaleString('fr-FR')}</span>`;
 /** Étoiles gagnées par les legs (distinctes des étoiles de niveau). */
 
-const legacyStars = () => (state.stars ? `<span class="legacy-stars" title="${state.stars} legs">✦${state.stars}</span>` : '');
 const gem = (n) => `<span class="price gem">${icon('gem')}${Number(n).toLocaleString('fr-FR')}</span>`;
 const fmtDuration = (ms) => {
   const totalMin = Math.max(0, Math.ceil(ms / MINUTE));
@@ -90,11 +91,17 @@ function phaseOf(t) {
 // -----------------------------------------------------------------------------
 async function boot() {
   document.body.insertAdjacentHTML('afterbegin', globalDefs());
+  // Planches de sprites : lancées tout de suite ; on redessine dès qu'un type est prêt.
+  loadSprites(() => { if (!state) return; layoutKey = ''; roomKeys.clear(); render(); });
   state = (await store.load()) || createState(now());
   const lastSeenLog = prefs.get('lastSeenLog', 0);
   const nightsBefore = state.stats.nights;
   advance(state, now());
   await store.save(state);
+  setSoundEnabled(prefs.get('sound', true));
+  soundSeq = state.logSeq; // ce qui s'est passé en votre absence ne fait pas de bruit
+  document.addEventListener('pointerdown', unlockAudio, { capture: true, passive: true });
+  document.addEventListener('click', (e) => { if (e.target.closest('button')) sfx('click', 1); }, true);
 
   bindEvents();
   render();
@@ -108,7 +115,6 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
   if (DEV) renderDevBar();
   // Planches de sprites (essai) : on redessine tout dès qu'une planche est chargée.
-  loadSprites(() => { layoutKey = ''; roomKeys.clear(); render(); });
 
   if (lastSeenLog === 0) openHelp();
   else if (state.stats.nights > nightsBefore) openJournal('Pendant votre absence', lastSeenLog);
@@ -122,6 +128,14 @@ function tick() {
   if (advance(state, now()) > 0) {
     dirty = true;
     if (!selectionValid()) selection = null;
+  }
+  if (state.logSeq > soundSeq) {
+    for (const l of state.log) {
+      if (l.id <= soundSeq) continue;
+      const snd = soundForLog(l);
+      if (snd) sfx(...snd);
+    }
+    soundSeq = state.logSeq;
   }
   if (dirty) { store.save(state); dirty = false; }
   render();
@@ -172,7 +186,7 @@ function act(fn, ...args) {
   const name = ACTION_NAMES.get(fn);
   if (!name) throw new Error('Action non déclarée dans ALL_ACTIONS');
   const res = dispatch(state, name, args, now());
-  if (!res.ok) toast(res.error, 'bad');
+  if (!res.ok) { toast(res.error, 'bad'); sfx('error', 2); } else sfx(ACTION_SOUNDS[name] || 'click', 2);
   dirty = true;
   tick();
   return res;
@@ -318,7 +332,6 @@ function showThought(g) {
 
 function renderHud(t) {
   const c = clockInfo(state, t);
-  $('#hud-level').innerHTML = `<span class="lvl-stars">${levelStars(state.hotel.level)}${legacyStars()}</span><span class="lvl-name">${esc(state.hotel.name)}</span>`;
   $('#money').textContent = state.money.toLocaleString('fr-FR');
   $('#money').closest('.res').classList.toggle('debt', state.money < 0);
   $('#gems').textContent = (state.gems || 0).toLocaleString('fr-FR');
@@ -373,7 +386,7 @@ function renderBuilding(t, occ, sats) {
     const row = (f) => (f > span.top ? 2 : extra + 2 + span.top - f);
     let cells = `<div class="roof" style="grid-row:1;grid-column:${Math.min(...topCols) - c0 + 1} / ${Math.max(...topCols) - c0 + 2}">
         <div class="roof-props"><div class="antenna">${antennaSVG()}</div><div class="tower">${waterTowerSVG()}</div></div>
-        <div class="neon" style="--neon:${NEON_COLORS[h.neon ?? DEFAULT_NEON]}"><div class="sign-stars">${levelStars(h.level)}</div><div class="sign-name">${esc(h.name)}</div><div class="sign-sub">HÔTEL${state.stars ? ` <span class="sign-legacy">${'✦'.repeat(Math.min(5, state.stars))}${state.stars > 5 ? state.stars : ''}</span>` : ''}</div><span class="poles"></span></div>
+        <div class="neon" style="--neon:${NEON_COLORS[h.neon ?? DEFAULT_NEON]}"><div class="sign-stars">${levelStars(h.level)}</div><div class="sign-name" style="font-size:${Math.max(15, Math.min(30, Math.round(420 / Math.max(14, [...h.name].length))))}px">${esc(h.name)}</div><div class="sign-sub">HÔTEL${state.stars ? ` <span class="sign-legacy">${'✦'.repeat(Math.min(5, state.stars))}${state.stars > 5 ? state.stars : ''}</span>` : ''}</div><span class="poles"></span></div>
         <div class="chimneys-wrap">${chimneysSVG(topCols.length)}</div>
         ${roofSVG(Math.max(...topCols) - Math.min(...topCols) + 1)}
       </div>`;
@@ -871,7 +884,7 @@ function bindEvents() {
   $('#tab-office').addEventListener('click', openOffice);
   $('#tab-lab').addEventListener('click', () => openLab());
   $('#quest').addEventListener('click', openQuest);
-  $('#hud-level').addEventListener('click', openOffice);
+
   $('#sheet-backdrop').addEventListener('click', closeSheet);
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
@@ -1517,6 +1530,7 @@ function openOffice() {
         <button class="ext-card" data-do="extend" ${!canExtend || state.money < ext ? 'disabled' : ''}>${icon('build')}<b>Ajouter un emplacement</b><small>${h.floors} / ${CONFIG.maxFloors} étages · ${h.cols} / ${CONFIG.maxCols} colonnes</small>${ext ? cur(ext) : '<small>Gratuit</small>'}</button>
       </div>
       <p class="muted">On agrandit case par case : à côté d'une pièce, ou au-dessus du dernier étage. Les 9 premiers emplacements sont gratuits, puis le prix augmente avec la taille de l'hôtel. Au-delà de 9 pièces, chaque emplacement rapporte 1 ⭐.</p>
+      <button class="set-row sound-row" data-do="sound"><small>Sons du jeu</small><b>${soundEnabled() ? '🔊 Activés' : '🔇 Coupés'}</b>${icon('right')}</button>
       ${restartHTML()}
       <h3>${icon('bell')} Publicité du jour</h3>
       ${h.level < 2 ? `<p class="muted">Les sponsors ne s’intéressent qu’aux hôtels de niveau 2 et plus : payez votre première taxe !</p>` : `<p class="muted">Chaque jour, de nouveaux sponsors proposent de vous envoyer des clients. Ils arrivent au réveil, à ${CONFIG.wakeUpHour}h.</p>
@@ -1549,6 +1563,7 @@ function openOffice() {
       `Votre hôtel actuel sera définitivement perdu. ${custom === '1' ? `Vous repartirez avec l’accueil seul et ${CUSTOM_START_MONEY} ${CURRENCY} pour bâtir vous-même vos pièces.` : 'Vous repartirez avec un hôtel neuf de 6 chambres.'} Vos gemmes vous suivent.`, () => resetGame(custom === '1')),
     rename: openRename,
     manager: openManager,
+    sound: () => { const on = !soundEnabled(); setSoundEnabled(on); prefs.set('sound', on); if (on) sfx('done', 3); openOffice(); },
     neon: (i) => { if (act(setNeon, Number(i)).ok) openOffice(); },
     goals: openAchievements,
     legacy: () => confirmSheet('Léguer votre hôtel ?', `Vous repartirez au niveau ${LEGACY.restartLevel} avec l'accueil seul. Vous gardez votre argent (+${LEGACY.compensation} 🪙), 1 employé et votre réserve ; les chambres, les clients, le mobilier et l'arbre de talents sont perdus. En échange : une étoile, +${LEGACY.fame} ⭐ et 5 points de talents de plus au maximum.`, () => act(bequeathHotel)),

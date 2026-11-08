@@ -57,24 +57,33 @@ function makeSheet(name, img, type) {
 /** Cherche les planches de chaque type ; `onReady` est rappelé quand un type en a trouvé. */
 export function loadSprites(onReady) {
   for (const type of TYPE_IDS) {
+    pending.add(type);
     (async () => {
+      // Toutes les variantes sont demandées en même temps (plus rapide qu'une à une).
+      const names = [type, ...Array.from({ length: MAX_VARIANTS }, (_, i) => `${type}${i + 1}`)];
+      const imgs = await Promise.all(names.map((n) => loadImage(`${DIR}${n}.png`)));
       const found = [];
-      const plain = await loadImage(`${DIR}${type}.png`);
-      if (plain) found.push(makeSheet(type, plain, type));
-      for (let n = 1; n <= MAX_VARIANTS; n++) {
-        const img = await loadImage(`${DIR}${type}${n}.png`);
-        if (!img) break;
-        found.push(makeSheet(`${type}${n}`, img, type));
-      }
-      if (!found.length) return; // pas de planche : on garde le dessin maison
-      sheets[type] = found;
+      if (imgs[0]) found.push(makeSheet(type, imgs[0], type));
+      for (let n = 1; n < names.length && imgs[n]; n++) found.push(makeSheet(names[n], imgs[n], type));
+      pending.delete(type);
+      if (found.length) sheets[type] = found; // sinon : on garde le dessin maison
       onReady(type);
     })();
   }
 }
 
-/** SVG animé de la créature (planche choisie selon `look`), ou null sans planche pour ce type. */
+/** Types dont les planches sont encore en cours de chargement. */
+const pending = new Set();
+
+/** Créature invisible (même cadre) le temps que les planches de son type arrivent. */
+const PLACEHOLDER = '<svg class="creature sprite loading" viewBox="0 0 64 64" aria-hidden="true"></svg>';
+
+/**
+ * SVG animé de la créature (planche choisie selon `look`) ; une place vide tant que
+ * les planches de son type se chargent ; null si ce type n'a aucune planche.
+ */
 export function spriteSVG(type, look = 0, extraClass = '', delay = 0) {
+  if (pending.has(type)) return PLACEHOLDER;
   const list = sheets[type];
   if (!list) return null;
   const s = list[Math.abs(look) % list.length];
