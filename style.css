@@ -554,7 +554,7 @@ body:is([data-phase="night"], [data-phase="evening"]) .kind-empty .room-art { fi
 .status-dot { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
 .status-dot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #9aa; flex-shrink: 0; }
 .status-dot.free::before { background: var(--good); }
-.status-dot.lobby::before { background: #4f8cff; }
+.status-dot.at-lobby::before { background: #4f8cff; }
 .status-dot.repair::before { background: var(--mid); }
 .status-dot.care::before { background: #ff6b81; }
 
@@ -1062,7 +1062,6 @@ body:is([data-phase="evening"], [data-phase="night"], [data-phase="dusk"]) .room
 .led.small { font-size: 13px; padding: 0 5px; }
 .awning { overflow: visible; }
 .awning-clock { position: absolute; left: 50%; top: -22px; transform: translateX(-50%); z-index: 4; }
-.lobby-clock { position: absolute; top: 8px; right: 22%; z-index: 3; }
 
 /* Rue, décor, vie */
 .street { position: relative; z-index: 3; height: 118px; margin: 0 -320px; }
@@ -1257,7 +1256,6 @@ body:is([data-phase="evening"], [data-phase="night"]) { --tint: .32; }
 .lobby-slot .awning { width: 82%; top: 4px; height: 24px; }
 .lobby-slot .lobby-staff { left: 4%; width: 60%; bottom: 14%; }
 .lobby-slot .lobby-plate { right: 6px; bottom: 6px; padding: 2px 7px; font-size: 13px; }
-.lobby-slot .lobby-clock { right: 8%; top: 6px; }
 /* Toit : posé sur la rangée du dernier étage, aligné sur ses cases */
 .floors > .roof { align-self: end; margin: 0 -18px; z-index: 3; }
 /* Emplacements d'agrandissement */
@@ -1579,3 +1577,26 @@ html, body { overscroll-behavior: none; }
 .or-line::before, .or-line::after { content: ''; flex: 1; height: 2px; background: var(--paper-3); border-radius: 2px; }
 
 .privacy-row { text-decoration: none; margin-bottom: 6px; }
+
+/* Bandeau « Nouvelle version » (service worker mis à jour). */
+.update-banner { position: fixed; z-index: 200; left: 50%; top: calc(var(--safe-t) + 70px); transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; padding: 9px 16px 9px 12px; border-radius: 16px;
+  background: linear-gradient(#ffe8a6, #f0b93a); color: #4a2f05; border: 2.5px solid #a8700a; box-shadow: 0 4px 0 #0006;
+  text-align: left; animation: thoughtIn .35s cubic-bezier(.2, .9, .3, 1.4); }
+.update-banner .ico { width: 22px; height: 22px; }
+.update-banner span { display: flex; flex-direction: column; line-height: 1.2; }
+.update-banner small { font-weight: 600; opacity: .8; }
+
+/* Personnel : à quoi servent les employés, noms modifiables. */
+.job-grid { display: grid; gap: 6px; margin-bottom: 6px; }
+.job-card { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: 14px; background: var(--paper-2); }
+.job-card > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.job-card small { color: var(--ink-2); font-size: 12.5px; line-height: 1.3; }
+.job-card em { font-style: normal; font-size: 12px; font-weight: 700; color: #b4541e; }
+.job-ico { flex-shrink: 0; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; background: #fff; box-shadow: 0 2px 0 var(--paper-3); }
+.job-ico .ico { width: 20px; height: 20px; }
+.staff-name { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; padding: 0; background: none; color: var(--ink); }
+.staff-name .ico { width: 14px; height: 14px; opacity: .55; }
+.staff-left { font-style: normal; font-size: 11.5px; color: var(--ink-2); margin-left: 14px; }
+.staff-btns { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.staff-btns .btn .ico { width: 14px; height: 14px; }

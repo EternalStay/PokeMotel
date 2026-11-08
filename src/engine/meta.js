@@ -252,3 +252,13 @@ export function setManager(state, name) {
   state.manager = clean;
   return { ok: true };
 }
+
+/** Renommer un employé. */
+export function renameStaff(state, staffId, name) {
+  const s = state.staff.find((x) => x.id === staffId);
+  if (!s) return { ok: false, error: 'Employé inconnu.' };
+  const clean = String(name || '').trim().slice(0, 20);
+  if (!clean) return { ok: false, error: 'Le nom ne peut pas être vide.' };
+  s.name = clean;
+  return { ok: true };
+}

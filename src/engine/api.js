@@ -6,12 +6,12 @@
 // =============================================================================
 
 import { ACTIONS } from './actions.js';
-import { buyCampaign, bequeathHotel, restartHotel, setNeon, setManager } from './meta.js';
+import { buyCampaign, bequeathHotel, restartHotel, setNeon, setManager, renameStaff } from './meta.js';
 import { setTitle } from './achievements.js';
 import { advance, isLocked } from './sim.js';
 
 /** Toutes les actions du joueur, par nom. Signature : (state, ...args, now). */
-export const ALL_ACTIONS = { ...ACTIONS, buyCampaign, bequeathHotel, restartHotel, setNeon, setManager, setTitle };
+export const ALL_ACTIONS = { ...ACTIONS, buyCampaign, bequeathHotel, restartHotel, setNeon, setManager, renameStaff, setTitle };
 
 export function dispatch(state, name, args = [], now = Date.now()) {
   const fn = Object.hasOwn(ALL_ACTIONS, name) ? ALL_ACTIONS[name] : null;

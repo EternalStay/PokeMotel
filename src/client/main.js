@@ -17,7 +17,7 @@ import {
   campaignsOf, buyCampaign, legacyStatus, bequeathHotel, LEGACY,
   placeGuest, moveGuest, fulfillRequest, hireStaff, assignStaff, recallStaff, buyItem, useItem, removeEquip,
   collectLeftover, buildRoom, demolishRoom, upgradeRoom, upgradeLobby, extendRoom, renameHotel,
-  ALL_ACTIONS, dispatch, restartHotel, setNeon, NEON_COLORS, DEFAULT_NEON, setManager, receiveParcel, CUSTOM_START_MONEY,
+  ALL_ACTIONS, dispatch, restartHotel, setNeon, NEON_COLORS, DEFAULT_NEON, setManager, renameStaff, receiveParcel, CUSTOM_START_MONEY,
   ACHIEVEMENTS, ACHIEVEMENT_KEYS, REWARDS, goalCount, totalPoints, nextReward, rewardName, titled, setTitle, WELL_TREATED,
 } from '../engine/index.js';
 import { LocalStore, prefs } from './storage.js';
@@ -207,6 +207,7 @@ function act(fn, ...args) {
 // -----------------------------------------------------------------------------
 function render() {
   const t = now();
+  if (selection || tray) guardBack(); // un mode en cours (placer, agrandir…) se quitte avec Retour
   const p = phaseOf(t);
   if (p !== phase) {
     phase = p;
@@ -413,11 +414,10 @@ function renderBuilding(t, occ, sats) {
           f > 0 && !at(f - 1, c) ? 'overhang' : ''].filter(Boolean).join(' ');
         let inner;
         if (r.kind === 'lobby') {
-          inner = `<div class="awning">${awningSVG()}<span class="awning-clock" title="Arrivée du prochain client">${ledClockHTML('--:--')}</span></div>
+          inner = `<div class="awning">${awningSVG()}<span class="awning-clock" data-hint="Arrivée du prochain client (l’heure actuelle est en haut à gauche).">${ledClockHTML('--:--')}</span></div>
             <button class="lobby ${staffTarget ? 'target mood-good' : ''}" data-lobby>
               ${lobbyCellSVG()}
               ${decoLayerHTML(furnitureAt(state, r.floor, r.col), r.col)}
-              <span class="lobby-clock" title="Heure de l'hôtel">${ledClockHTML('--:--', 'small')}</span>
               <div class="lobby-staff">${lobbyStaff.map((s) => `<div class="staff-sprite">${staffSVG(s, 'lobby')}</div>`).join('')}</div>
               <div class="lobby-plate">${icon('bell')}<small>${lobbyStaff.length}/${lobbyCapacity(state)}</small></div>
             </button>`;
@@ -457,11 +457,9 @@ function renderBuilding(t, occ, sats) {
     });
   }
 
-  // Horloges de l'auvent (prochain client) et de la réception (heure actuelle).
+  // Horloge de l'auvent : arrivée du prochain client (l'heure actuelle est dans le HUD).
   const ac = $('.awning-clock .led-text');
   if (ac) ac.textContent = state.nextArrival ? clock(state.nextArrival).replace('h', ':') : '--:--';
-  const lc = $('.lobby-clock .led-text');
-  if (lc) lc.textContent = clock(t).replace('h', ':');
 
   // Pièces : on ne redessine que ce qui a changé.
   const building = $('#building');
@@ -890,13 +888,33 @@ function bindEvents() {
   $('#quest').addEventListener('click', openQuest);
 
   $('#sheet-backdrop').addEventListener('click', closeSheet);
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    if (!$('#sheet').hidden) closeSheet();
-    else if (!$('#ctx').hidden) closeCtx();
-    else if (tray) { tray = null; renderActionBar(); }
-    else { selection = null; render(); }
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTopLayer(); });
+  // Touche Retour du téléphone : ferme la fenêtre (ou le mode) en cours au lieu de
+  // quitter le jeu. Une entrée d'historique « garde » est posée dès que quelque chose
+  // est ouvert ; Retour la consomme, on ferme alors ce qui est au premier plan.
+  window.addEventListener('popstate', () => {
+    if (closeTopLayer()) guardBack();
+    else history.back(); // rien d'ouvert : Retour fait son travail habituel
   });
+}
+
+/** Quelque chose à fermer avec Retour / Échap ? */
+const layerOpen = () => !$('#sheet').hidden || !$('#ctx').hidden || !!tray || !!selection;
+
+/** Ferme la fenêtre ou le mode au premier plan ; renvoie false s'il n'y avait rien. */
+function closeTopLayer() {
+  $('#tip').hidden = true;
+  if (!$('#sheet').hidden) closeSheet();
+  else if (!$('#ctx').hidden) closeCtx();
+  else if (tray) { tray = null; renderActionBar(); }
+  else if (selection) { selection = null; render(); }
+  else return false;
+  return true;
+}
+
+/** Pose l'entrée d'historique « garde » si une fenêtre ou un mode est ouvert. */
+function guardBack() {
+  if (layerOpen() && !(history.state && history.state.pmGuard)) history.pushState({ pmGuard: true }, '');
 }
 
 function confirmPlacement() {
@@ -1041,6 +1059,7 @@ function openSheet({ title, kicker = '', body, actions = [], cls = '', hero = ''
       `<button class="btn ${a.cls || ''}" data-i="${i}" ${a.disabled ? 'disabled' : ''}>${a.label}</button>`).join('')}</div>` : ''}`;
   sheet.hidden = false;
   $('#sheet-backdrop').hidden = false;
+  guardBack();
   sheet.querySelector('[data-close]').onclick = closeSheet;
   sheet.querySelectorAll('.sheet-actions [data-i]').forEach((b) => { b.onclick = () => sheetActions[Number(b.dataset.i)].run(); });
   return sheet;
@@ -1428,7 +1447,7 @@ function openLobby() {
 // --- Personnel -----------------------------------------------------------------
 function staffStatus(s) {
   if (!s.task) return { label: 'Libre', cls: 'free' };
-  if (s.task.kind === 'lobby') return { label: 'À la réception', cls: 'lobby' };
+  if (s.task.kind === 'lobby') return { label: 'À la réception', cls: 'at-lobby' };
   const room = state.rooms[s.task.roomId];
   if (s.task.kind === 'repair') return { label: `Répare la ${roomLabel(room)} · ${clock(s.task.end)}`, cls: 'repair' };
   const g = state.guests[s.task.guestId];
@@ -1436,36 +1455,68 @@ function staffStatus(s) {
 }
 
 function openStaff() {
+  const t = now();
   const cost = staffCost(state);
+  const occ = occupancy(state);
+  const inLobby = lobbyStaffCount(state);
+  const cap = lobbyCapacity(state);
+  // Ce qui attend un employé, pour savoir tout de suite où l'envoyer.
+  const damaged = Object.values(state.rooms).filter((r) => r.kind === 'bedroom' && r.damage > 0 && !occ[r.id] && !staffInRoom(state, r.id)).length;
+  const toCare = Object.values(occ).filter((g) => !g.cared && g.nightsLeft > 0 && !staffInRoom(state, g.roomId)).length;
+  const job = (ico, name, text, todo) => `<div class="job-card"><span class="job-ico">${ico}</span><div><b>${name}</b><small>${text}</small>${todo ? `<em>${todo}</em>` : ''}</div></div>`;
   const list = state.staff.map((s) => {
     const st = staffStatus(s);
+    const left = s.task && s.task.end ? `<i class="staff-left">encore ${fmtDuration(Math.max(0, s.task.end - t))}</i>` : '';
     return `<div class="staff-card">
       <div class="staff-portrait">${staffSVG(s, s.task && s.task.kind)}</div>
-      <div class="staff-info"><b>${esc(s.name)}</b><span class="status-dot ${st.cls}">${st.label}</span></div>
-      ${s.task ? `<button class="btn small ghost" data-do="recall" data-arg="${s.id}">Rappeler</button>`
-               : `<button class="btn small primary" data-do="assign" data-arg="${s.id}">Affecter</button>`}
+      <div class="staff-info"><button class="staff-name" data-do="rename" data-arg="${s.id}" aria-label="Renommer ${esc(s.name)}"><b>${esc(s.name)}</b>${icon('build')}</button>
+        <span class="status-dot ${st.cls}">${st.label}</span>${left}</div>
+      <div class="staff-btns">${s.task
+        ? `<button class="btn small ghost" data-do="recall" data-arg="${s.id}">Rappeler</button>`
+        : `<button class="btn small" data-do="lobby" data-arg="${s.id}" ${inLobby >= cap ? 'disabled' : ''}>${icon('bell')} Accueil</button>
+           <button class="btn small primary" data-do="assign" data-arg="${s.id}">Affecter…</button>`}</div>
     </div>`;
   }).join('');
   openSheet({
-    kicker: `${state.staff.length} employé${state.staff.length > 1 ? 's' : ''}`,
+    cls: 'tall',
+    kicker: `${state.staff.length} employé${state.staff.length > 1 ? 's' : ''} · ${freeStaff(state).length} libre${freeStaff(state).length > 1 ? 's' : ''}`,
     title: 'Le personnel',
-    body: `<p class="muted">Touchez « Affecter » puis la réception, une chambre abîmée ou un client.</p>
-      <div class="staff-list">${list}</div>`,
+    body: `<div class="job-grid">
+        ${job(icon('bell'), 'Accueil', `Les clients arrivent plus vite. Places : ${inLobby} / ${cap}.`, '')}
+        ${job(icon('wrench'), 'Réparation', `Remet en état une chambre libre abîmée (${cur(repairStepCost({ level: 1 }, state))} par dégât).`, damaged ? `${damaged} chambre${damaged > 1 ? 's' : ''} à réparer` : '')}
+        ${job(icon('heart'), 'Petites attentions', `Chouchoute un client quelques heures : sa satisfaction monte (${cur(careCost(state))}).`, toCare ? `${toCare} client${toCare > 1 ? 's' : ''} à chouchouter` : '')}
+      </div>
+      <p class="muted">« Affecter… » puis touchez la réception, une chambre abîmée ou un client. Touchez un nom pour le changer.</p>
+      ${state.staff.length ? `<div class="staff-list">${list}</div>` : '<p class="muted">Personne pour l’instant : recrutez votre premier employé !</p>'}`,
     actions: [staffPaidInGems(state)
       ? { label: `${icon('users')} Recruter ${gem(cost)}`, cls: 'primary', disabled: state.gems < cost, run: () => { if (act(hireStaff).ok) openStaff(); } }
       : { label: `${icon('users')} Recruter ${cur(cost)}`, cls: 'primary', disabled: state.money < cost, run: () => { if (act(hireStaff).ok) openStaff(); } }],
   });
   onSheetClick({
     assign: (id) => { selection = { mode: 'staff', staffId: id }; closeSheet(); render(); },
+    lobby: (id) => { if (act(assignStaff, id, 'lobby').ok) openStaff(); },
     recall: (id) => { act(recallStaff, id); openStaff(); },
+    rename: (id) => openStaffRename(id),
   });
 }
 
-// --- Boutique & réserve ---------------------------------------------------------
-function openShop(tab = 'shop') {
-  const owned = ITEM_IDS.filter((i) => state.inventory[i] > 0);
+function openStaffRename(id) {
+  const s = state.staff.find((x) => x.id === id);
+  if (!s) return;
+  openSheet({
+    title: 'Nom de l’employé',
+    body: `<label class="field"><span>Nouveau nom</span><input id="staff-name-input" maxlength="20" value="${esc(s.name)}"></label>`,
+    actions: [{ label: 'Renommer', cls: 'primary', run: () => { if (act(renameStaff, id, $('#staff-name-input').value).ok) openStaff(); } },
+      { label: 'Annuler', cls: 'ghost', run: openStaff }],
+  });
+  setTimeout(() => $('#staff-name-input')?.select(), 60);
+}
+
+// --- Boutique ----------------------------------------------------------------------
+// (La réserve se consulte et s'utilise depuis la barre du haut : Base, Déco, Spéciaux, Mobilier.)
+function openShop() {
   const kinds = [['base', 'Aménagements de base'], ['deco', 'Décoration'], ['special', 'Aménagements spéciaux']];
-  const shop = `<p class="muted gem-note">${GEMS} Les articles se paient en ${GEMS_NAME.toLowerCase()} : on en gagne avec les missions (5, et 10 à la fin du tutoriel), les clients comblés (1, une Star 2 à 5) et la taxe (10 × niveau).</p>`
+  const shop = `<p class="muted gem-note">${GEMS} Les articles se paient en ${GEMS_NAME.toLowerCase()} : on en gagne avec les missions (5, et 10 à la fin du tutoriel), les clients comblés (1, une Star 2 à 5) et la taxe (10 × niveau). Vos achats vont dans la réserve, en haut de l’écran.</p>`
     + kinds.map(([k, label]) => `<h3>${label}</h3><div class="shop-grid">${ITEM_IDS.filter((i) => ITEMS[i].shop === k).map((i) => {
     const it = ITEMS[i];
     const auras = it.auras && it.auras.length ? `<span class="aura-chips">${it.auras.map((a) => `<i style="--c:${AURAS[a].color}">${auraIcon(a)}</i>`).join('')}</span>` : '';
@@ -1474,41 +1525,28 @@ function openShop(tab = 'shop') {
       ${state.inventory[i] ? `<em class="owned">×${state.inventory[i]}</em>` : ''}</div>`;
   }).join('')}${PACKS[k] ? `<div class="shop-card pack"><div class="shop-art">${icon('gift')}</div><b>${PACKS[k].name}</b><small>Un exemplaire de chaque article du rayon.</small>
       <button class="btn small primary" data-do="pack" data-arg="${k}" ${state.gems < PACKS[k].price ? 'disabled' : ''}>${gem(PACKS[k].price)}</button></div>` : ''}</div>`).join('');
-  const inv = owned.length
-    ? `<div class="inv-grid">${owned.map((i) => `<button class="inv-tile" data-do="${ITEMS[i].kind === 'decobox' ? 'openbox' : 'use'}" data-arg="${i}">${itemSVG(i)}<span>${ITEMS[i].kind === 'decobox' ? `Ouvrir : ${ITEMS[i].name}` : ITEMS[i].name}</span><em>×${state.inventory[i]}</em></button>`).join('')}</div>
-       <p class="muted">Touchez un objet, puis la pièce où l'utiliser. Peintures et papiers peints changent tout l'étage.</p>`
-    : '<p class="muted">Votre réserve est vide.</p>';
-  const stored = (state.furniture || []).filter((p) => p.floor == null).length;
-  const furnitureNote = (state.furniture || []).length
-    ? `<button class="btn" data-do="deco">${icon('sparkle')} Changer le mobilier${stored ? ` (${stored} en réserve)` : ''}</button>` : '';
 
   openSheet({
     cls: 'tall',
     kicker: `Vous avez ${(state.gems || 0).toLocaleString('fr-FR')} ${GEMS} · ${state.money.toLocaleString('fr-FR')} ${CURRENCY}`,
-    title: tab === 'shop' ? 'Boutique' : 'Réserve',
-    body: `<div class="seg"><button class="${tab === 'shop' ? 'on' : ''}" data-do="tab" data-arg="shop">${icon('shop')} Boutique</button>
-      <button class="${tab === 'inv' ? 'on' : ''}" data-do="tab" data-arg="inv">${icon('box')} Réserve (${owned.reduce((s, i) => s + state.inventory[i], 0)})</button></div>
-      ${tab === 'shop' ? shop : inv + furnitureNote}`,
+    title: 'Boutique',
+    body: shop,
   });
+  const keepScroll = (fn) => { const y = $('#sheet .sheet-body').scrollTop; fn(); $('#sheet .sheet-body').scrollTop = y; };
   onSheetClick({
-    tab: (t) => openShop(t),
-    buy: (id) => {
-      if (act(buyItem, id).ok) {
-        toast(`${ITEMS[id].name} ajouté à la réserve.`, 'good');
-        const y = $('#sheet .sheet-body').scrollTop;
-        openShop('shop');
-        $('#sheet .sheet-body').scrollTop = y;
-      }
-    },
-    use: (id) => { selection = { mode: 'item', itemId: id }; closeSheet(); render(); },
-    pack: (id) => { if (act(buyPack, id).ok) { toast(`${PACKS[id].name} : articles ajoutés à la réserve.`, 'good'); openShop('shop'); } },
-    openbox: () => { const res = act(openDecoBox); if (res.ok) { toast(`Dans le carton : ${DECO_FAMILIES[res.piece.type].name} !`, 'good'); selection = { mode: 'deco', decoId: res.piece.id }; closeSheet(); render(); } },
-    deco: startDeco,
+    buy: (id) => { if (act(buyItem, id).ok) { toast(`${ITEMS[id].name} ajouté à la réserve.`, 'good'); keepScroll(openShop); } },
+    pack: (id) => { if (act(buyPack, id).ok) { toast(`${PACKS[id].name} : articles ajoutés à la réserve.`, 'good'); keepScroll(openShop); } },
   });
 }
 
 // --- Bureau (niveau, taxe, agrandissement, stats) --------------------------------
-function openOffice() {
+// Position de défilement du Bureau, gardée quand on y revient après un réglage
+// (nom de l'hôtel, gérant, néon, sons…) au lieu de remonter tout en haut.
+let officeY = 0;
+const rememberOffice = () => { officeY = $('#sheet .sheet-body')?.scrollTop || 0; };
+const backToOffice = () => openOffice({ keep: true });
+
+function openOffice({ keep = false } = {}) {
   const t = now();
   const h = state.hotel;
   const tax = taxAmount(state);
@@ -1533,10 +1571,11 @@ function openOffice() {
       <div class="ext-grid">
         <button class="ext-card" data-do="extend" ${!canExtend || state.money < ext ? 'disabled' : ''}>${icon('build')}<b>Ajouter un emplacement</b><small>${h.floors} / ${CONFIG.maxFloors} étages · ${h.cols} / ${CONFIG.maxCols} colonnes</small>${ext ? cur(ext) : '<small>Gratuit</small>'}</button>
       </div>
-      <p class="muted">On agrandit case par case : à côté d'une pièce, ou au-dessus du dernier étage. Les 9 premiers emplacements sont gratuits, puis le prix augmente avec la taille de l'hôtel. Au-delà de 9 pièces, chaque emplacement rapporte 1 ⭐.</p>
+      <p class="muted">On agrandit case par case : à côté d'une pièce, ou sur le toit au-dessus d'une pièce. Le prix augmente avec la taille de l'hôtel ; au-delà de 9 pièces, chaque emplacement rapporte 1 ⭐.</p>
       ${accountHTML()}
       <a class="set-row privacy-row" href="confidentialite.html" target="_blank" rel="noopener"><small>Vos données</small><b>🔒 Règles de confidentialité</b>${icon('right')}</a>
       <button class="set-row sound-row" data-do="sound"><small>Sons du jeu</small><b>${soundEnabled() ? '🔊 Activés' : '🔇 Coupés'}</b>${icon('right')}</button>
+      <button class="set-row sound-row" data-do="reload"><small>Un souci d’affichage ?</small><b>🔄 Recharger le jeu</b>${icon('right')}</button>
       ${restartHTML()}
       <h3>${icon('bell')} Publicité du jour</h3>
       ${h.level < 2 ? `<p class="muted">Les sponsors ne s’intéressent qu’aux hôtels de niveau 2 et plus : payez votre première taxe !</p>` : `<p class="muted">Chaque jour, de nouveaux sponsors proposent de vous envoyer des clients. Ils arrivent au réveil, à ${CONFIG.wakeUpHour}h.</p>
@@ -1557,25 +1596,26 @@ function openOffice() {
         <div><b>${s.stars}</b><small>Stars ravies</small></div><div><b>${s.earned.toLocaleString('fr-FR')}</b><small>gagnés</small></div>
       </div>`,
     actions: [
-      ...((state.furniture || []).length || state.inventory.randdeco ? [{ label: `${icon('sparkle')} Changer le mobilier`, run: startDeco }] : []),
       { label: `${icon('star')} Succès`, run: openAchievements },
       { label: `${icon('help')} Aide`, run: openHelp },
     ],
   });
   onSheetClick({
     extend: startExtend,
-    ad: (i) => { if (act(buyCampaign, Number(i)).ok) { toast('Campagne signée !', 'good'); openOffice(); } },
+    ad: (i) => { rememberOffice(); if (act(buyCampaign, Number(i)).ok) { toast('Campagne signée !', 'good'); backToOffice(); } },
     restart: (custom) => confirmSheet(custom === '1' ? 'Début personnalisé ?' : 'Recommencer ?',
       `Votre hôtel actuel sera définitivement perdu. ${custom === '1' ? `Vous repartirez avec l’accueil seul et ${CUSTOM_START_MONEY} ${CURRENCY} pour bâtir vous-même vos pièces.` : 'Vous repartirez avec un hôtel neuf de 6 chambres.'} Vos gemmes vous suivent.`, () => resetGame(custom === '1')),
-    rename: openRename,
-    manager: openManager,
+    rename: () => { rememberOffice(); openRename(); },
+    manager: () => { rememberOffice(); openManager(); },
     login: openLogin,
     logout: () => confirmSheet('Se déconnecter ?', 'Votre hôtel reste enregistré sur votre compte. Sur cet appareil, vous repartirez d’une partie locale.', () => signOut()),
-    sound: () => { const on = !soundEnabled(); setSoundEnabled(on); prefs.set('sound', on); if (on) sfx('done', 3); openOffice(); },
-    neon: (i) => { if (act(setNeon, Number(i)).ok) openOffice(); },
+    sound: () => { rememberOffice(); const on = !soundEnabled(); setSoundEnabled(on); prefs.set('sound', on); if (on) sfx('done', 3); backToOffice(); },
+    neon: (i) => { rememberOffice(); if (act(setNeon, Number(i)).ok) backToOffice(); },
+    reload: () => location.reload(),
     goals: openAchievements,
     legacy: () => confirmSheet('Léguer votre hôtel ?', `Vous repartirez au niveau ${LEGACY.restartLevel} avec l'accueil seul. Vous gardez votre argent (+${LEGACY.compensation} 🪙), 1 employé et votre réserve ; les chambres, les clients, le mobilier et l'arbre de talents sont perdus. En échange : une étoile, +${LEGACY.fame} ⭐ et 5 points de talents de plus au maximum.`, () => act(bequeathHotel)),
   });
+  if (keep) $('#sheet .sheet-body').scrollTop = officeY;
 }
 
 /** « Recommencer » : seulement jusqu'à la mission de la première nuit. */
@@ -1656,8 +1696,8 @@ function openManager() {
   openSheet({
     title: 'Nom du gérant',
     body: `<label class="field"><span>Votre nom (affiché avec votre titre)</span><input id="manager-input" maxlength="24" value="${esc(state.manager || '')}"></label>`,
-    actions: [{ label: 'Enregistrer', cls: 'primary', run: () => { if (act(setManager, $('#manager-input').value).ok) openOffice(); } },
-      { label: 'Annuler', cls: 'ghost', run: openOffice }],
+    actions: [{ label: 'Enregistrer', cls: 'primary', run: () => { if (act(setManager, $('#manager-input').value).ok) backToOffice(); } },
+      { label: 'Annuler', cls: 'ghost', run: backToOffice }],
   });
   setTimeout(() => $('#manager-input')?.select(), 60);
 }
@@ -1680,8 +1720,8 @@ function openRename() {
   openSheet({
     title: 'Nom de l\'hôtel',
     body: `<label class="field"><span>Nouveau nom</span><input id="rename-input" maxlength="32" value="${esc(state.hotel.name)}"></label>`,
-    actions: [{ label: 'Renommer', cls: 'primary', run: () => { const v = $('#rename-input').value; act(renameHotel, v); openOffice(); } },
-      { label: 'Annuler', cls: 'ghost', run: closeSheet }],
+    actions: [{ label: 'Renommer', cls: 'primary', run: () => { const v = $('#rename-input').value; act(renameHotel, v); backToOffice(); } },
+      { label: 'Annuler', cls: 'ghost', run: backToOffice }],
   });
   setTimeout(() => $('#rename-input')?.select(), 60);
 }
@@ -1840,6 +1880,7 @@ function openCtx(id) {
   el.hidden = false;
   el._actions = actions;
   placeCtx(anchor);
+  guardBack();
 }
 
 /** Colle le menu à la pièce (au-dessus si possible, sinon en dessous), sans sortir de l'écran. */
@@ -1880,6 +1921,7 @@ const itemCat = (id) => {
 function renderActionBar() {
   const bar = $('#actionbar');
   if (!bar) return;
+  if (tray) guardBack();
   const canExtend = (state.questsDone >= EXTEND_QUEST || state.quest.id >= EXTEND_QUEST) && extendSlots(state).length > 0;
   const furn = (state.furniture || []).length + (state.inventory.randdeco || 0);
   const mode = selection && selection.mode;
@@ -1921,7 +1963,7 @@ function onBarTap(id) {
 
 function onTrayTap(id) {
   if (id === '@close') { tray = null; renderActionBar(); return; }
-  if (id === '@shop') { tray = null; openShop('shop'); return; }
+  if (id === '@shop') { tray = null; openShop(); return; }
   if (ITEMS[id].kind === 'decobox') {
     const res = act(openDecoBox);
     if (res.ok) { toast(`Dans le carton : ${DECO_FAMILIES[res.piece.type].name} !`, 'good'); selection = { mode: 'deco', decoId: res.piece.id }; tray = null; render(); }
@@ -2248,8 +2290,34 @@ function renderDevBar() {
 // -----------------------------------------------------------------------------
 // Service worker (mode hors-ligne / installation)
 // -----------------------------------------------------------------------------
+// Mises à jour : à chaque publication (VERSION de sw.js incrémentée), le nouveau
+// service worker prend la main sur les jeux ouverts. On recharge alors tout seul si le
+// jeu est en arrière-plan (au retour, il est à jour), sinon un bandeau propose de le
+// faire. Le jeu vérifie à chaque retour au premier plan et toutes les 10 minutes.
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  const reload = () => { if (!reloading) { reloading = true; location.reload(); } };
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) return; // première installation : la page est déjà la bonne version
+    if (document.hidden) document.addEventListener('visibilitychange', reload, { once: true });
+    else showUpdateBanner(reload);
+  });
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').then((reg) => {
+    const check = () => reg.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    setInterval(check, 10 * 60 * 1000);
+  }).catch(() => {}));
+}
+
+function showUpdateBanner(onTap) {
+  if ($('#update-banner')) return;
+  const b = document.createElement('button');
+  b.id = 'update-banner';
+  b.className = 'update-banner';
+  b.innerHTML = `${icon('sparkle')}<span><b>Nouvelle version du jeu</b><small>Touchez pour mettre à jour</small></span>`;
+  b.addEventListener('click', onTap);
+  document.body.appendChild(b);
 }
 
 boot();

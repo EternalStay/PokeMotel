@@ -722,3 +722,15 @@ test('legs : conditions, puis nouvel hôtel au niveau 2 avec une étoile', async
   assert.ok(QUESTS[s.quest.id].repeat);
   assert.ok(s.inventory.radiateur >= 2);
 });
+
+test('renommer un employé', async () => {
+  const { renameStaff, hireStaff, dispatch } = await import('../src/engine/index.js');
+  const s = blank(at(2026, 11, 10, 12));
+  s.money = 10000;
+  assert.ok(hireStaff(s, s.time).ok);
+  const id = s.staff[s.staff.length - 1].id;
+  assert.ok(dispatch(s, 'renameStaff', [id, '  Pikachu  '], s.time).ok);
+  assert.equal(s.staff.find((x) => x.id === id).name, 'Pikachu');
+  assert.equal(renameStaff(s, id, '   ').ok, false);
+  assert.equal(renameStaff(s, 'inconnu', 'Bob').ok, false);
+});
