@@ -1,6 +1,6 @@
 // =============================================================================
 // Illustrations du jeu, dessinées en SVG (aucun fichier image externe) :
-// créatures, personnel, intérieurs de pièces, mobilier, équipements, décor.
+// Pokémon, personnel, intérieurs de pièces, mobilier, équipements, décor.
 // Toutes les fonctions renvoient des chaînes SVG.
 // =============================================================================
 
@@ -95,7 +95,7 @@ export function globalDefs() {
 }
 
 // -----------------------------------------------------------------------------
-// Créatures (dessin paramétrique : type + variante d'apparence + humeur)
+// Pokémon (dessin paramétrique : type + variante d'apparence + humeur)
 // -----------------------------------------------------------------------------
 
 /**
@@ -213,7 +213,7 @@ export function creatureSVG(g, mood = 'good', extraClass = '') {
   </svg>`;
 }
 
-/** Employé (groom) — même style que les créatures, en uniforme. */
+/** Employé (groom) — même style que les Pokémon, en uniforme. */
 export function staffSVG(s, tool = null) {
   const hue = ['#c0392b', '#2e86de', '#16a085', '#8e44ad', '#d35400'][s.look % 5];
   const toolSvg = {

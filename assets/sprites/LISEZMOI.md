@@ -6,7 +6,7 @@ Déposez ici des planches PNG nommées d'après le type :
 - idem pour `eau`, `poison`, `plante`, `glace`, `electrik`, `normal`, `roche`, `insecte`, `psy`,
   `combat`, `spectre`.
 
-Chaque créature reçoit une variante de son type au hasard et la garde tout son séjour. Elle est
+Chaque Pokémon reçoit une variante de son type au hasard et la garde tout son séjour. Elle est
 animée avec les 2 premières lignes de 4 images (0,5 s par image). Sans fichier, le jeu garde
 ses dessins SVG. Rechargez la page après avoir ajouté un fichier.
 

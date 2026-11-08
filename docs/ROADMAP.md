@@ -252,11 +252,11 @@ Décidé le 2026-11-08 : auras ci-dessus, niveaux de déblocage d'origine.
 - [ ] K4 Mur de l'hôtel (commentaires, j'aime, partage).
 
 ### Lot L — Finitions
-- [ ] L1 Noms définitifs des créatures et du jeu (« PokéMotel » est un titre de travail).
+- [ ] L1 Noms définitifs des Pokémon et du jeu (« PokéMotel » est un titre de travail).
 - [ ] L2 Équilibrage final.
 - [ ] L3 Langues (optionnel), accessibilité, performance (grands hôtels, option « basse qualité »).
 
-**Avancement (2026-11-08, V0.9.1)** : lots A à I et M terminés (60 tests, dont une partie « fuzz » qui joue des semaines au hasard ; `FUZZ_SEEDS=80 npm test` pour une passe lourde). Toutes les actions passent par `dispatch` (point d'entrée unique, prêt pour le serveur). Essai en cours : planches de sprites animées par type, plusieurs variantes possibles (`assets/sprites/<type>1.png`…, une au hasard par créature).
+**Avancement (2026-11-08, V0.9.1)** : lots A à I et M terminés (60 tests, dont une partie « fuzz » qui joue des semaines au hasard ; `FUZZ_SEEDS=80 npm test` pour une passe lourde). Toutes les actions passent par `dispatch` (point d'entrée unique, prêt pour le serveur). Essai en cours : planches de sprites animées par type, plusieurs variantes possibles (`assets/sprites/<type>1.png`…, une au hasard par Pokémon).
 
 **Ordre** : J (Supabase) → J (Supabase) → K (social) → L (finitions).
 Le moteur passe avant tout le reste : c'est la base sur laquelle on ajustera ensuite le système de types.

@@ -151,7 +151,7 @@ export function adviceHTML(items) {
 /** Ambiance reçue par une chambre libre : auras entrantes, pour qui elle est idéale ou à éviter. */
 export function ambianceHTML(state, room) {
   const occ = occupancy(state);
-  if (roomEquipEffects(room).isolate) return '<p class="muted">Chambre isolée : aucune aura n\'y entre.</p>';
+  if (roomEquipEffects(room).isolate) return '<p class="muted">Chambre isolée : rien n\'y entre (ni chaleur, ni bruit, ni odeurs…).</p>';
   const incoming = [];
   for (const id of neighborIds(state, room.id)) {
     const n = occ[id];
@@ -160,7 +160,7 @@ export function ambianceHTML(state, room) {
     incoming.push({ n, aura: 'voisinage' });
   }
   for (const id of room.equip) for (const a of (ITEMS_CACHE[id] || [])) incoming.push({ n: null, aura: a, item: id });
-  if (!incoming.length) return '<p class="muted">Aucune aura ne parvient dans cette chambre : idéale pour un client qui déteste tout, mauvaise pour qui aime quelque chose (−3 par goût absent).</p>';
+  if (!incoming.length) return '<p class="muted">Rien ne parvient dans cette chambre (ni chaleur, ni bruit, ni odeurs…) : idéale pour un client qui déteste tout, à éviter pour un client qui aime quelque chose (−3 par goût qui lui manque).</p>';
   const kinds = [...new Set(incoming.map((x) => x.aura))];
   return `<div class="amb">${incoming.map(({ n, aura }) => `<span class="amb-chip">${auraIcon(aura)}<b>${AURAS[aura].name}</b><small>${n ? esc(n.name) : 'équipement'}</small></span>`).join('')}</div>
     <p class="amb-ok">${icon('check')} Idéale pour qui aime : ${kinds.map((a) => `<b>${AURAS[a].name}</b>`).join(', ')}</p>

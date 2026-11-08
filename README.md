@@ -1,6 +1,6 @@
 # PokéMotel (titre provisoire) — V0.9.2
 
-Jeu de gestion d'hôtel pour créatures, inspiré du concept de CroqueMotel, avec des **affinités de types**.
+Jeu de gestion d'hôtel pour Pokémon, inspiré du concept de CroqueMotel, avec des **affinités de types**.
 PWA mobile, HTML/CSS/JS vanilla, sans dépendance ni étape de build. Toutes les illustrations sont
 dessinées en SVG dans `src/client/art.js` (aucune image externe). Polices : Fredoka + Lilita One (Google Fonts).
 
@@ -118,7 +118,7 @@ Le mode `?dev` ajoute un bouton **⏩ DEV** : +10 min, +1h, minuit, 10h, 8h, +10
   travaux, paie de minuit, missions, niveau, explosion. Un seul son à la fois ; rien pendant le rattrapage d'une
   absence. Interrupteur dans le Bureau (mémorisé).
 - **Sprites (essai)** : une planche `assets/sprites/<type>.png` (ou des variantes `<type>1.png`, `<type>2.png`…,
-  une au hasard par créature) remplace le dessin SVG de ce type par une
+  une au hasard par Pokémon) remplace le dessin SVG de ce type par une
   animation de 8 images (voir `assets/sprites/LISEZMOI.md`).
 
 ## Scène et interface (V0.4.2)
@@ -164,7 +164,7 @@ src/engine/   moteur pur (aucune dépendance au navigateur → réutilisable cô
   achievements.js  succès (compteurs, paliers, titres)
 src/client/
   main.js          scène, interactions, fenêtres (rendu incrémental)
-  art.js           illustrations SVG (créatures, pièces, décor)
+  art.js           illustrations SVG (Pokémon, pièces, décor)
   icons.js         icônes d'interface, auras, humeurs, directions
   insight.js       aides visuelles (pastilles, bulles de pensée, mini-carte, conseils)
   storage.js       LocalStore (futur SupabaseStore, même interface)

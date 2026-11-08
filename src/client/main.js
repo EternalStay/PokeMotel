@@ -730,7 +730,7 @@ function traitsHTML(g, { emit = true } = {}) {
   const emits = TYPES[g.type].auras;
   const row = (cls, ico, label, list, empty) => `<span class="qrow ${cls}"><span class="qlabel">${icon(ico)}${label}</span>
     <span class="qtags">${list.length ? list.map(auraTag).join('') : `<i class="tchip none">${empty}</i>`}</span></span>`;
-  return `<span class="qrows">${row('like', 'heart', 'Aime', g.likes, 'rien')}${row('dislike', 'close', 'Déteste', g.dislikes, 'rien')}${emit ? row('emit', 'bubble', 'Émet', emits, 'rien (invisible)') : ''}</span>`;
+  return `<span class="qrows">${row('like', 'heart', 'Aime', g.likes, 'rien')}${row('dislike', 'close', 'Déteste', g.dislikes, 'rien')}${emit ? row('emit', 'bubble', 'Dégage', emits, 'rien (invisible)') : ''}</span>`;
 }
 
 /** Phrase de profil, comme dans CroqueMotel. */
@@ -764,7 +764,7 @@ function renderQueue() {
       <span class="qhead"><span class="qavatar">${creatureSVG(g, 'good')}</span>
         <span class="qid"><b>${esc(g.name)}${g.star ? ` ${icon('star')}` : ''}</b>
           <span class="qmeta"><i class="qtype" style="--c:${t.color};--d:${t.dark}">${t.name}</i><i class="qstay">${icon('moon')}${g.stay}</i>
-            <i class="qemit" title="Émet vers ses voisins">${icon('bubble')}${t.auras.length ? t.auras.map((a) => auraIcon(a)).join('') : 'rien'}</i></span></span></span>
+            <i class="qemit" title="Ce qu’il dégage autour de lui">${icon('bubble')}${t.auras.length ? t.auras.map((a) => auraIcon(a)).join('') : 'rien'}</i></span></span></span>
       ${traitsHTML(g, { emit: false })}
     </button>`;
   }).join('');
@@ -823,7 +823,7 @@ function renderHint() {
   } else if (selection.mode === 'extend') {
     const cost = extendCost(state);
     html = `<div class="hint-row"><div class="hint-art hint-ico">${icon('build')}</div>
-      <div class="hint-text"><b>Agrandir l'hôtel</b><small>Touchez un emplacement en pointillés : à côté d'une pièce (le porte-à-faux est permis), ou sur le toit, au-dessus d'une pièce. Prochain emplacement : ${cost ? `${cost} 🪙` : 'gratuit'}${Object.keys(state.rooms).length >= CONFIG.extendFameFromRooms ? ', +1 ⭐' : ''}.</small></div>
+      <div class="hint-text"><b>Agrandir l'hôtel</b><small>Touchez un emplacement en pointillés : à côté d'une pièce (même si rien ne la soutient en dessous), ou sur le toit, au-dessus d'une pièce. Prochain emplacement : ${cost ? `${cost} 🪙` : 'gratuit'}${Object.keys(state.rooms).length >= CONFIG.extendFameFromRooms ? ', +1 ⭐' : ''}.</small></div>
       <button class="icon-btn" data-action="cancel" aria-label="Terminer">${icon('check')}</button></div>`;
   } else if (selection.staffId) {
     const s = state.staff.find((x) => x.id === selection.staffId);
@@ -1098,7 +1098,7 @@ function openGuest(guestId) {
     <div class="fact-grid">
       <div class="fact like"><small>Aime</small><b>${g.likes.length ? g.likes.map((a) => `${auraIcon(a)} ${AURAS[a].name}`).join(' ') : 'rien de spécial'}</b></div>
       <div class="fact dislike"><small>Déteste</small><b>${g.dislikes.length ? g.dislikes.map((a) => `${auraIcon(a)} ${AURAS[a].name}`).join(' ') : 'rien de spécial'}</b></div>
-      <div class="fact"><small>Émet vers ses voisins</small><b>${t.auras.length ? t.auras.map((a) => `${auraIcon(a)} ${AURAS[a].name}`).join(' ') : 'rien'}</b></div>
+      <div class="fact"><small>Dégage autour de lui</small><b>${t.auras.length ? t.auras.map((a) => `${auraIcon(a)} ${AURAS[a].name}`).join(' ') : 'rien'}</b></div>
       <div class="fact"><small>Séjour</small><b>${g.roomId ? `${g.nightsLeft} / ${g.stay} nuit(s)` : `${g.stay} nuit(s)`}</b></div>
     </div>
     <div class="trait-card" style="--c:${t.color}"><b>${t.trait.name}</b><span>${esc(t.trait.desc)}</span></div>
@@ -1186,7 +1186,7 @@ function openRoom(room) {
     kicker: `Chambre ${roomLabel(room)} · niveau ${room.level}`,
     title: room.damage ? `Chambre abîmée (${room.damage}/${CONFIG.maxDamage})` : 'Chambre libre',
     body: `${staff ? `<div class="trait-card"><b>${icon('wrench')} ${staff.name} répare</b><span>Prochain point vers ${clock(staff.task.end)}.</span></div>` : ''}
-      <div class="info-row"><span>Gain maximal / nuit (client à 10)</span>${cur(nightGain(10, room))}</div>
+      <div class="info-row"><span>Gain maximal par nuit (client à 10/10)</span>${cur(nightGain(10, room))}</div>
       <h3>Ambiance de la chambre</h3>${ambianceHTML(state, room)}
       ${equipSectionHTML(room, false)}`,
     actions,
@@ -1206,13 +1206,13 @@ function openFacility(room) {
       <p class="muted">Quand un client affiche une bulle ${SERVICES[b.service].icon}, touchez-la pour le servir.</p>`;
   } else {
     const fans = Object.values(state.guests).filter((g) => g.roomId && g.likes.includes(b.aura));
-    body += `<div class="info-row"><span>Gain par visite (2 h à 3 h, puis 5 h de repos)</span>${cur(CONFIG.leisure.gain)}</div>
-      <div class="info-row"><span>Amateurs de ${AURAS[b.aura].name} actuellement</span><b>${fans.length}</b></div>
-      <p class="muted">Les salles d'ambiance n'émettent rien vers les chambres voisines.</p>`;
+    body += `<div class="info-row"><span>Gain par visite (le client y reste 2 à 3 h, puis la salle ferme 5 h)</span>${cur(CONFIG.leisure.gain)}</div>
+      <div class="info-row"><span>Clients qui aiment : ${AURAS[b.aura].name}</span><b>${fans.length}</b></div>
+      <p class="muted">Une salle de loisir ne dérange pas les chambres voisines.</p>`;
   }
   openSheet({
     hero: `<div class="hero-room">${roomSVG(room, { busy: room.busyUntil > t })}</div>`,
-    kicker: b.kind === 'service' ? 'Salle de service' : 'Salle d\'ambiance',
+    kicker: b.kind === 'service' ? 'Salle de service' : 'Salle de loisir',
     title: b.name,
     body,
     actions: [
@@ -1761,7 +1761,7 @@ function openHelp() {
   const chart = TYPE_IDS.map((id) => {
     const t = TYPES[id];
     return `<div class="type-row" style="--c:${t.color}"><div class="type-mini">${creatureSVG({ type: id, look: 3 }, 'good')}</div>
-      <div><b>${t.name}</b><small class="type-emit">Émet ${t.auras.length ? t.auras.map((a) => `${auraIcon(a)} ${AURAS[a].name}`).join(' + ') : 'rien'} · dès le niveau ${t.unlock}</small><small><i>${t.trait.name}</i> : ${esc(t.trait.desc)}</small></div></div>`;
+      <div><b>${t.name}</b><small class="type-emit">Dégage ${t.auras.length ? t.auras.map((a) => `${auraIcon(a)} ${AURAS[a].name}`).join(' + ') : 'rien'} · dès le niveau ${t.unlock}</small><small><i>${t.trait.name}</i> : ${esc(t.trait.desc)}</small></div></div>`;
   }).join('');
   openSheet({
     cls: 'tall',
@@ -1769,25 +1769,25 @@ function openHelp() {
     title: 'Bienvenue à l\'hôtel !',
     body: `
       <ol class="steps">
-        <li><b>Installez les clients</b> de la file d'attente : touchez-en un, puis une chambre. Le chiffre affiché sur chaque chambre est sa future satisfaction.</li>
-        <li><b>Chaque type émet son aura</b> vers ses 4 voisins (gauche, droite, dessus, dessous) et a une particularité (liste en bas). Tout voisin visible apporte aussi du Voisinage. On ne ressent jamais sa propre aura.</li>
-        <li><b>Chaque client a 2 goûts</b> (aime / déteste). Partant de 3 : ce qu'il aime rapporte <b>+2 par source</b> mais coûte <b>−3 s'il en manque</b> ; ce qu'il déteste coûte <b>−3 par source</b> mais rapporte <b>+2 s'il n'y en a pas</b>.</li>
-        <li><b>Chaque client paie deux fois</b> selon sa satisfaction (jusqu'à 50 🪙 à 10/10) : à minuit, puis à son départ à <b>10h</b>. Un déménagement lui coûte 2 points (une seule fois). Personne n'arrive entre minuit et ${CONFIG.wakeUpHour}h ; sans personnel à la réception, un client arrive toutes les 8 h.</li>
-        <li><b>${GEMS} Les ${GEMS_NAME.toLowerCase()}</b> se gagnent en jouant : missions (10 à la fin du tutoriel, puis 5), clients comblés (1 ; une Star 2 à 5), taxe payée (10 × niveau). Elles paient la Boutique, les employés au-delà du 4e, « Attirer un client » et la remise à zéro des talents.</li>
-        <li><b>La caisse démarre vide</b> : le Consortium la remet à 300 🪙 chaque nuit où elle passe sous 100, jusqu'au niveau 3.</li>
-        <li><b>Suivez les missions</b> (bouton en haut de la barre de gauche) : elles vous guident pas à pas et rapportent argent, objets, clients et points de recherche. Après le tutoriel, des missions répétables rapportent du prestige.</li>
-        <li><b>Le Laboratoire</b> (niveau 2) : étudier un client (il part sans payer, tous les autres perdent 1) fait avancer la recherche ; à 5 études, une fiole apparaît : ramassez-la pour gagner 1 point à dépenser dans l'arbre de talents (onglet Labo).</li>
-        <li><b>Imprévus</b> : toutes les 9 à 21 h, un événement peut survenir (bonne surprise, petit tracas, accident, vol, Star démasquée…).</li>
-        <li><b>Payez la taxe</b> (nuit du dimanche au lundi, seulement si vous avez accueilli quelqu'un dans la semaine) pour monter de niveau : nouveaux types de clients, nouveaux goûts, machines de service, salles de loisir, séjours plus longs.</li>
+        <li><b>Installez les clients</b> qui attendent devant l'hôtel : touchez-en un, puis une chambre. Chaque chambre affiche alors la note sur 10 qu'aurait le client s'il y dormait.</li>
+        <li><b>Chaque Pokémon dégage quelque chose</b> selon son type (de la chaleur, de l'humidité, des odeurs, du froid, du bruit…). Ses voisins directs le ressentent : à gauche, à droite, au-dessus et en dessous. Avoir un voisin tient aussi <b>compagnie</b>. On ne ressent jamais ce qu'on dégage soi-même.</li>
+        <li><b>Chaque client a 2 goûts</b> : des choses qu'il aime ou qu'il déteste. Il arrive avec une note de 3. Ce qu'il aime lui donne <b>+2 par voisin ou objet qui en apporte</b>, mais <b>−3 s'il n'en a pas du tout</b>. Ce qu'il déteste lui coûte <b>−3 par voisin qui en apporte</b>, mais lui donne <b>+2 s'il n'y en a pas</b>.</li>
+        <li><b>Chaque client paie deux fois</b>, selon sa note (jusqu'à 50 🪙 s'il est à 10/10) : à minuit, puis en partant à <b>10h</b>. Le changer de chambre lui fait perdre 2 points (une seule fois). Personne n'arrive entre minuit et ${CONFIG.wakeUpHour}h. Sans employé à la réception, un client arrive toutes les 8 h.</li>
+        <li><b>${GEMS} Les ${GEMS_NAME.toLowerCase()}</b> se gagnent en jouant : missions (10 à la fin du tutoriel, puis 5), clients ravis (1, ou 2 à 5 pour une Star), taxe payée (10 × niveau). Elles servent à la Boutique, à recruter au-delà du 4e employé, à « Attirer un client » et à remettre les talents à zéro.</li>
+        <li><b>La caisse démarre vide</b> : jusqu'au niveau 3, le Consortium (l'organisme qui prélève la taxe) la remet à 300 🪙 chaque nuit où elle descend sous 100.</li>
+        <li><b>Suivez les missions</b> (le parchemin en haut à gauche) : elles vous guident pas à pas et rapportent argent, objets, clients et points de recherche. « Montrez-moi » indique où toucher. Après le tutoriel, d'autres missions rapportent du prestige ⭐.</li>
+        <li><b>Le Laboratoire</b> (dès le niveau 2) : on y envoie un client pour l'étudier. Il part sans payer et les autres clients perdent 1 point. Toutes les 5 études, une fiole apparaît : ramassez-la pour gagner 1 point de recherche, à dépenser dans l'onglet Labo.</li>
+        <li><b>Imprévus</b> : toutes les 9 à 21 h, il peut se passer quelque chose (bonne surprise, petit tracas, accident, vol, Star démasquée…).</li>
+        <li><b>Payez la taxe</b> chaque nuit du dimanche au lundi (seulement si vous avez accueilli quelqu'un dans la semaine) pour monter de niveau : nouveaux types de clients, nouveaux goûts, salles de service et de loisir, séjours plus longs.</li>
       </ol>
       <h3>Lire l'hôtel en un coup d'œil</h3>
       <ul class="legend">
-        <li><span class="mood-badge mood-good">${faceIcon(8)}<b>8</b></span> Humeur du client (0 à 10) : vert = content, orange = mitigé, rouge = mécontent.</li>
-        <li><span class="fx pos">${dirIcon('up')}${auraIcon('humidite')}<b>+2</b></span> Ce qui lui plaît : la flèche montre le voisin responsable, l'icône l'aura reçue.</li>
-        <li><span class="fx neg">${dirIcon('left')}${auraIcon('chaleur')}<b>-3</b></span> Ce qui le gêne : une aura qu'il déteste envoyée par un voisin.</li>
-        <li><span class="fx neg missing">${auraIcon('froid')}<b>-3</b></span> Pointillés = il lui MANQUE cette aura : trouvez-lui un voisin ou un équipement qui la produit.</li>
-        <li><span class="request ok static"><span class="req-icon">🍰</span><span class="req-state">${icon('check')}</span></span> Demande de service : coche = servez-le d'un toucher, horloge = salle occupée, cadenas = salle à construire.</li>
-        <li><span class="best static">${icon('star')}Top</span> Pendant un placement : la meilleure chambre. Touchez une chambre pour voir le détail, puis « Installer ici ».</li>
+        <li><span class="mood-badge mood-good">${faceIcon(8)}<b>8</b></span> Note du client, de 0 à 10 : vert = content, orange = mitigé, rouge = mécontent.</li>
+        <li><span class="fx pos">${dirIcon('up')}${auraIcon('humidite')}<b>+2</b></span> Ce qui lui plaît : la flèche montre le voisin d'où ça vient, l'icône ce qu'il reçoit.</li>
+        <li><span class="fx neg">${dirIcon('left')}${auraIcon('chaleur')}<b>-3</b></span> Ce qui le gêne : un voisin lui envoie quelque chose qu'il déteste.</li>
+        <li><span class="fx neg missing">${auraIcon('froid')}<b>-3</b></span> En pointillés : il lui MANQUE quelque chose qu'il aime. Donnez-lui un voisin ou un objet qui en apporte.</li>
+        <li><span class="request ok static"><span class="req-icon">🍰</span><span class="req-state">${icon('check')}</span></span> Le client demande un service : coche = touchez la bulle pour le servir, horloge = la salle est occupée, cadenas = la salle n'est pas encore construite.</li>
+        <li><span class="best static">${icon('star')}Top</span> Pendant que vous installez un client : la meilleure chambre pour lui.</li>
       </ul>
       <h3>Les types</h3><div class="type-list">${chart}</div>`,
     actions: [{ label: 'C\'est parti !', cls: 'primary', run: closeSheet }],

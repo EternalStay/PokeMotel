@@ -1,7 +1,7 @@
 {
   "name": "PokéMotel",
   "short_name": "PokéMotel",
-  "description": "Dirigez un motel pour créatures : placez vos clients selon leurs affinités de types.",
+  "description": "Dirigez un hôtel pour Pokémon : installez vos clients selon leurs goûts et ceux de leurs voisins.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",

@@ -10,7 +10,7 @@
 // Simplification demandée : un type = une aura (Feu = Chaleur, Eau = Humidité,
 // Poison = Odeurs, Glace = Froid, Normal = Bruit). Pas de tableau d'efficacité.
 // Chaque type reprend la règle spéciale d'une famille d'origine (docs/ROADMAP.md §1).
-// Les noms de créatures sont PROVISOIRES.
+// Les noms des Pokémon sont PROVISOIRES.
 // =============================================================================
 
 /** Symbole de la monnaie du jeu (provisoire). */
@@ -35,7 +35,7 @@ export const AURAS = {
   odeur:     { id: 'odeur',     name: 'Odeurs',    icon: '☠️', color: '#a14fc4' },
   froid:     { id: 'froid',     name: 'Froid',     icon: '❄️', color: '#7fd6e6' },
   bruit:     { id: 'bruit',     name: 'Bruit',     icon: '🔊', color: '#c9b98a' },
-  voisinage: { id: 'voisinage', name: 'Voisinage', icon: '👥', color: '#64b5f6' },
+  voisinage: { id: 'voisinage', name: 'Compagnie', icon: '👥', color: '#64b5f6' },
 };
 export const AURA_IDS = Object.keys(AURAS);
 
@@ -45,7 +45,7 @@ export function tastePool(level) {
 }
 
 /**
- * Types de créatures.
+ * Types de Pokémon.
  * - auras  : auras émises vers les voisins
  * - unlock : niveau d'hôtel à partir duquel le type peut arriver
  * - weight : fréquence relative
@@ -70,9 +70,9 @@ export const TYPES = {
   combat:   { id: 'combat',   name: 'Combat',   color: '#e0594a', dark: '#9c2a1f', icon: '🥊', auras: ['odeur'],    unlock: 5, weight: 10,
               trait: { name: 'Hystérique',     desc: 'À 4 ou moins, il hurle : −3 pour TOUS les autres clients de l\'hôtel.' } },
   plante:   { id: 'plante',   name: 'Plante',   color: '#73cc5a', dark: '#3d8a2c', icon: '🌿', auras: ['humidite', 'odeur'], unlock: 5, weight: 10,
-              trait: { name: 'Monstro-plante', desc: 'Émet deux auras à la fois : Humidité et Odeurs.' } },
+              trait: { name: 'Monstro-plante', desc: 'Dégage deux choses à la fois autour de lui : Humidité et Odeurs.' } },
   spectre:  { id: 'spectre',  name: 'Spectre',  color: '#8f7cc7', dark: '#55448c', icon: '👻', auras: [],           unlock: 6, weight: 10,
-              trait: { name: 'Invisible',      desc: 'N\'émet rien et ne compte pas comme voisin.' } },
+              trait: { name: 'Invisible',      desc: 'Ne dégage rien et ne compte pas comme un voisin.' } },
   electrik: { id: 'electrik', name: 'Électrik', color: '#ffd23f', dark: '#c49a0a', icon: '⚡', auras: ['bruit'],    unlock: 7, weight: 10,
               trait: { name: 'Survolté',       desc: 'À 0 ou à 10, il devient instable et explose 3 h plus tard (chambre détruite) si rien ne change.' } },
 };
@@ -125,7 +125,7 @@ export const BUILDABLES = {
   patinoire: { id: 'patinoire', kind: 'leisure', name: 'Patinoire',       cost: 'leisure', minutes: 30, level: 3, max: 3, aura: 'froid',
                desc: 'Les clients qui aiment le Froid viennent s\'y détendre (5 🪙 par visite).' },
   labo:      { id: 'labo',      kind: 'lab',     name: 'Laboratoire',     cost: 250, minutes: 30, level: 2, max: 2,
-               desc: 'Envoyez-y un client pour étudier les monstres : 5 études = une fiole à ramasser (1 point de recherche).' },
+               desc: 'Envoyez-y un client pour étudier les Pokémon : 5 études = une fiole à ramasser (1 point de recherche).' },
   karaoke:   { id: 'karaoke',   kind: 'leisure', name: 'Karaoké',         cost: 'leisure', minutes: 30, level: 3, max: 3, aura: 'bruit',
                desc: 'Les clients qui aiment le Bruit viennent s\'y détendre (5 🪙 par visite).' },
 };
@@ -152,7 +152,7 @@ export const ITEMS = {
   enceinte:    { id: 'enceinte',    kind: 'equip', name: 'Enceinte XXL',         price: 4, shop: 'base', auras: ['bruit'],
                  desc: 'Génère du Bruit dans la chambre.' },
   nounours:    { id: 'nounours',    kind: 'equip', name: 'Nounours câlin',       price: 4, shop: 'base', auras: ['voisinage'],
-                 desc: 'Tient compagnie : compte comme du Voisinage.' },
+                 desc: 'Tient compagnie au client, comme s\'il avait un voisin.' },
   hammam:      { id: 'hammam',      kind: 'equip', name: 'Kit hammam',           price: 6, auras: ['chaleur', 'humidite'],
                  desc: 'Génère de la Chaleur ET de l\'Humidité.' },
   fondue:      { id: 'fondue',      kind: 'equip', name: 'Fondue oubliée',       price: 6, auras: ['chaleur', 'odeur'],

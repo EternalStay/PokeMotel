@@ -1,10 +1,10 @@
 // =============================================================================
 // Planches de sprites animées (essai) : si des fichiers existent pour un type,
-// ses créatures sont dessinées avec leurs images successives au lieu du SVG
+// ses Pokémon sont dessinées avec leurs images successives au lieu du SVG
 // maison. Sans fichier, rien ne change.
 //
 // Fichiers (dans assets/sprites/) : <type>.png et/ou <type>1.png, <type>2.png…
-// (jusqu'à 9, sans trou dans la numérotation). Chaque créature reçoit une des
+// (jusqu'à 9, sans trou dans la numérotation). Chaque Pokémon reçoit une des
 // planches de son type au hasard, et la garde pendant tout son séjour.
 //
 // Réglages : par type (SPRITE_TYPES), et au besoin par fichier (SPRITE_FILES,
@@ -75,11 +75,11 @@ export function loadSprites(onReady) {
 /** Types dont les planches sont encore en cours de chargement. */
 const pending = new Set();
 
-/** Créature invisible (même cadre) le temps que les planches de son type arrivent. */
+/** Pokémon invisible (même cadre) le temps que les planches de son type arrivent. */
 const PLACEHOLDER = '<svg class="creature sprite loading" viewBox="0 0 64 64" aria-hidden="true"></svg>';
 
 /**
- * SVG animé de la créature (planche choisie selon `look`) ; une place vide tant que
+ * SVG animé du Pokémon (planche choisie selon `look`) ; une place vide tant que
  * les planches de son type se chargent ; null si ce type n'a aucune planche.
  */
 export function spriteSVG(type, look = 0, extraClass = '', delay = 0) {

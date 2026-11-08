@@ -201,10 +201,10 @@ export function adviceFor(state, guest) {
     if (guest.type === 'electrik' && (sat.value === 0 || sat.value === 10)) out.push({ tone: 'bad', text: 'Il est instable : ramenez-le entre 1 et 9 avant l\'explosion !' });
     for (const l of sat.lines) if (l.kind === 'hysteria') out.push({ tone: 'bad', text: `${l.source} hurle dans l'hôtel (−3) : calmez-le.` });
   } else {
-    for (const a of guest.likes) out.push({ tone: 'tip', text: `Il veut : ${AURAS[a].name} — ${howToGet(a, state.hotel.level)} (+2 par source, −3 si absent).` });
-    for (const a of guest.dislikes) out.push({ tone: 'bad', text: `Il déteste : ${AURAS[a].name} — évitez ${a === 'voisinage' ? 'de lui donner des voisins' : `les voisins ${emittersOf(a, state.hotel.level).join(' ou ') || '(aucun type pour l\'instant)'}`} (−3 par source, +2 si absent).` });
+    for (const a of guest.likes) out.push({ tone: 'tip', text: `Il veut : ${AURAS[a].name} — ${howToGet(a, state.hotel.level)} (+2 pour chaque voisin ou objet qui en apporte, −3 s'il n'y en a aucun).` });
+    for (const a of guest.dislikes) out.push({ tone: 'bad', text: `Il déteste : ${AURAS[a].name} — évitez ${a === 'voisinage' ? 'de lui donner des voisins' : `les voisins ${emittersOf(a, state.hotel.level).join(' ou ') || '(aucun type pour l\'instant)'}`} (−3 pour chaque voisin qui en apporte, +2 s'il n'y en a aucun).` });
   }
   const t = TYPES[guest.type];
-  out.push({ tone: 'tip', text: `Trait ${t.trait.name} : ${t.trait.desc}` });
+  out.push({ tone: 'tip', text: `Particularité « ${t.trait.name} » : ${t.trait.desc}` });
   return out;
 }
