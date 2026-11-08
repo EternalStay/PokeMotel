@@ -1572,3 +1572,9 @@ html, body { overscroll-behavior: none; }
   color: #fff; background: conic-gradient(#ea4335 0 25%, #fbbc05 0 50%, #34a853 0 75%, #4285f4 0); }
 .or-line { display: flex; align-items: center; gap: 10px; margin: 14px 0 6px; color: var(--ink-2); font-size: 12px; }
 .or-line::before, .or-line::after { content: ''; flex: 1; height: 2px; background: var(--paper-3); border-radius: 2px; }
+
+/* Lien légal (visible, discret) : nom du jeu + règles de confidentialité. */
+.legal-link { position: absolute; z-index: 8; left: 8px; bottom: 6px; padding: 2px 8px; border-radius: 999px;
+  background: #0d103080; color: #ffffffb0; font-size: 10.5px; font-weight: 600; text-decoration: none; }
+.legal-link:hover { color: #fff; background: #0d1030cc; }
+@media (min-width: 900px) { .legal-link { left: 50%; transform: translateX(-50%); } }
