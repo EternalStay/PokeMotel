@@ -153,7 +153,7 @@ Décidé le 2026-11-08 : auras ci-dessus, niveaux de déblocage d'origine.
 - ✅ 11 compteurs et 39 paliers (seuils et points d'origine, titres et badges maison), points totaux, titre affiché avec le nom du gérant. Le compteur « visites » attend le lot K.
 
 ### 2.20 Social
-- ❌ Amis, classement par prestige, visite en spectateur, envoi d'Œufs surprise, mur de l'hôtel (lot K).
+- ✅ Amis (code ami, demandes, lien d'invitation), classement par prestige (amis / tous), visite en spectateur, envoi d'Œufs surprise (1 par jour), mur de l'hôtel (messages entre amis, « j'aime ») (lot K).
 
 ---
 
@@ -241,15 +241,15 @@ Décidé le 2026-11-08 : auras ci-dessus, niveaux de déblocage d'origine.
 - [x] I6 Interface épurée, fidèle à l'original : plus de cartes de file en bas (les clients attendent dans la rue), un seul bandeau en haut, mission dans la barre d'actions, onglets en icônes ; installer un client = toucher le client puis la chambre (sa note est affichée d'avance).
 
 ### Lot J — Serveur (Supabase)
-- [ ] J1 Comptes (e-mail + Google), table `hotels` (état jsonb), RLS.
-- [ ] J2 Moteur exécuté côté serveur (Edge Function) : `advance` + actions validées, horloge serveur.
-- [ ] J3 `SupabaseStore` côté client (même interface que `LocalStore`), mode hors-ligne en lecture.
+- [x] J1 Comptes (e-mail + Google), table `hotels` (état jsonb), RLS.
+- [x] J2 Moteur exécuté côté serveur (Edge Function) : `advance` + actions validées, horloge serveur.
+- [x] J3 `SupabaseStore` côté client (même interface que `LocalStore`), mode hors-ligne en lecture.
 
 ### Lot K — Social
-- [ ] K1 Amis (recherche, demandes), classement par prestige.
-- [ ] K2 Visite en spectateur + panneau du propriétaire.
-- [ ] K3 Envoi d'Œufs surprise (3 max en attente, 1 par jour), récompenses.
-- [ ] K4 Mur de l'hôtel (commentaires, j'aime, partage).
+- [x] K1 Amis (recherche, demandes), classement par prestige.
+- [x] K2 Visite en spectateur + panneau du propriétaire.
+- [x] K3 Envoi d'Œufs surprise (3 max en attente, 1 par jour), récompenses.
+- [x] K4 Mur de l'hôtel (commentaires, j'aime, partage).
 
 ### Lot L — Finitions
 - [ ] L1 Noms définitifs des Pokémon et du jeu (« PokéMotel » est un titre de travail).

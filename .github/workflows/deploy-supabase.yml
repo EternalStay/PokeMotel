@@ -1,7 +1,10 @@
-# Redéploie la fonction Supabase « act » (le serveur du jeu) quand le moteur change.
-# Prérequis (une seule fois) : secret de dépôt SUPABASE_ACCESS_TOKEN
-#   GitHub › Settings › Secrets and variables › Actions › New repository secret
-#   (jeton créé sur https://supabase.com/dashboard/account/tokens).
+# Redéploie le serveur Supabase quand le moteur ou la base change :
+#   1. applique les nouvelles migrations (supabase/migrations) ;
+#   2. redéploie la fonction « act ».
+# Secrets de dépôt (GitHub › Settings › Secrets and variables › Actions) :
+#   SUPABASE_ACCESS_TOKEN : jeton créé sur https://supabase.com/dashboard/account/tokens
+#   SUPABASE_DB_PASSWORD  : mot de passe de la base (Supabase › Project Settings › Database),
+#                           nécessaire pour appliquer les migrations.
 # Lancement manuel possible : onglet Actions › « Déployer le serveur » › Run workflow.
 name: Déployer le serveur
 
@@ -11,6 +14,7 @@ on:
     paths:
       - 'src/engine/**'
       - 'supabase/functions/**'
+      - 'supabase/migrations/**'
       - 'supabase/config.toml'
       - 'tools/sync-engine.mjs'
   workflow_dispatch:
@@ -24,6 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       PROJECT_REF: biwenlmxtabconpkblke
     steps:
       - uses: actions/checkout@v4
@@ -41,6 +46,15 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.121.0
+
+      - name: Appliquer les migrations de la base
+        run: |
+          if [ -z "$SUPABASE_DB_PASSWORD" ]; then
+            echo "::warning::Secret SUPABASE_DB_PASSWORD absent : migrations non appliquées (ajoutez-le, puis relancez)."
+            exit 0
+          fi
+          supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase db push --include-all --password "$SUPABASE_DB_PASSWORD"
 
       - name: Déployer la fonction act
         run: |

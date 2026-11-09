@@ -55,6 +55,9 @@ let thoughtSeed = 0;
 let soundSeq = 0;
 /** Jeu en ligne : { userId, email } quand le joueur est connecté (le serveur fait foi). */
 let online = null;
+/** Visite d'un autre hôtel : { hotel, mine, friend, wall, likes, liked } ; `home` garde le nôtre. */
+let visit = null;
+let home = null;
 let serverQueue = Promise.resolve();
 let pendingCalls = 0;
 /** Détails de satisfaction et aperçus calculés au dernier rendu. */
@@ -121,7 +124,7 @@ async function boot() {
   if (DEV) renderDevBar();
   // Planches de sprites (essai) : on redessine tout dès qu'une planche est chargée.
 
-  initOnline();
+  initOnline().then(() => { if (!online) handleInviteLink(); });
   setInterval(() => syncFromServer(), 2 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromServer(); });
 
@@ -146,9 +149,9 @@ function tick() {
     }
     soundSeq = state.logSeq;
   }
-  if (dirty) { store.save(state); dirty = false; }
+  if (dirty && !visit) { store.save(state); dirty = false; }
   render();
-  showNotices();
+  if (!visit) { showNotices(); maybePendingFriend(); }
   maybeThought();
 }
 
@@ -197,6 +200,7 @@ function buzz(pattern) {
 }
 
 function act(fn, ...args) {
+  if (visit) { toast('Vous êtes en visite : rentrez chez vous pour jouer.', 'bad'); return { ok: false }; }
   if (isLocked(now())) { toast('Minuit sonne : le Consortium fait ses comptes. Revenez dans une minute !', 'bad'); return { ok: false }; }
   const name = ACTION_NAMES.get(fn);
   if (!name) throw new Error('Action non déclarée dans ALL_ACTIONS');
@@ -262,8 +266,7 @@ function render() {
   renderQueue();
   renderHint();
   renderActionBar();
-  maybeQuestPointer();
-  maybeQuestBanner();
+  if (!visit) { maybeQuestPointer(); maybeQuestBanner(); }
   for (const el of document.querySelectorAll('[data-until]')) el.textContent = fmtCountdown(Number(el.dataset.until) - t);
   popSatisfactionChanges(occ, sats);
 }
@@ -955,6 +958,7 @@ function bindEvents() {
   $('#tab-shop').addEventListener('click', () => openShop());
   $('#tab-staff').addEventListener('click', openStaff);
   $('#tab-office').addEventListener('click', openOffice);
+  $('#tab-friends').addEventListener('click', () => openFriends());
   $('#tab-lab').addEventListener('click', () => openLab());
   $('#quest').addEventListener('click', openQuest);
 
@@ -1001,6 +1005,7 @@ function confirmPlacement() {
 }
 
 function onQueueTap(id) {
+  if (visit) return;
   if (selection && selection.guestId === id) selection = null;
   else selection = { mode: 'place', guestId: id };
   render();
@@ -1043,6 +1048,7 @@ function startExtend() {
 }
 
 function onExtendTap(where) {
+  if (visit) return;
   const [f, c] = where.split(':').map(Number);
   const res = act(extendRoom, f, c);
   if (res.ok) {
@@ -1952,6 +1958,8 @@ function ctxContent(room) {
     if (room.kind === 'lab') A.push({ ico: 'research', label: 'Étudier…', cls: 'primary', run: () => openLabRoom(room) });
     A.push({ ico: 'scroll', label: 'Détails', run: () => openFacility(room) });
   }
+  // En visite : on regarde, on ne touche à rien.
+  if (visit) A.splice(0, A.length, ...A.filter((a) => a.ico === 'scroll'));
   return { head, actions: A };
 }
 
@@ -2297,9 +2305,12 @@ async function connect(session) {
   adoptServerState(res.state, true);
   toast(`Connecté : ${online.email}. Votre hôtel est enregistré en ligne.`, 'good');
   if (!$('#sheet').hidden && $('#lg-mail')) closeSheet();
+  handleInviteLink();
+  refreshFriendsBadge();
 }
 
 async function goOffline() {
+  exitVisit();
   online = null;
   prefs.set('owner', '');
   await store.reset();
@@ -2311,6 +2322,7 @@ async function goOffline() {
 
 /** Remplace l'état par celui du serveur. Les fenêtres déjà montrées en local ne reviennent pas. */
 function adoptServerState(s, fresh = false) {
+  if (visit) { if (!fresh) s.notices = home.notices; home = s; return; } // en visite : on met notre hôtel de côté
   if (!fresh) s.notices = state.notices;
   state = s;
   adoptLocal();
@@ -2337,8 +2349,19 @@ function sendToServer(name, args) {
   });
 }
 
+/** Pastille « demandes d'amis reçues » sur l'onglet Amis. */
+async function refreshFriendsBadge() {
+  if (!online) return;
+  const res = await social('me');
+  if (!res.ok) return;
+  const n = res.friends.filter((f) => f.status === 'incoming').length;
+  $('#friends-badge').hidden = !n;
+  $('#friends-badge').textContent = n;
+}
+
 async function syncFromServer() {
   if (!online || pendingCalls) return;
+  refreshFriendsBadge();
   const res = await callServer({ op: 'load', clearNotices: true });
   if (online && res.state && !pendingCalls) adoptServerState(res.state);
 }
@@ -2421,6 +2444,285 @@ function renderDevBar() {
 // -----------------------------------------------------------------------------
 // Service worker (mode hors-ligne / installation)
 // -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// Social : amis, classement, visite d'un hôtel, Œufs surprise, mur et « j'aime ».
+// Tout passe par le serveur (op 'social.*') ; chacun est désigné par son code ami.
+// -----------------------------------------------------------------------------
+const fmtCode = (c) => (c ? `${c.slice(0, 4)} ${c.slice(4)}` : '');
+const inviteLink = (code) => `${location.origin}${location.pathname}?ami=${code}`;
+const social = (op, data = {}) => callServer({ op: `social.${op}`, ...data });
+let friendsTab = 'friends'; // 'friends' | 'ranking'
+let rankingScope = 'friends';
+
+function friendsOffline() {
+  openSheet({
+    kicker: 'Amis',
+    title: 'Jouer avec ses amis',
+    body: `<p>Ajoutez vos amis avec leur code, comparez vos hôtels au classement, visitez-les, envoyez-leur un Œuf surprise chaque jour et laissez un mot sur leur mur.</p>
+      <p class="muted">Il faut d’abord jouer en ligne, pour que vos amis puissent trouver votre hôtel.</p>`,
+    actions: [{ label: '☁️ Jouer en ligne', cls: 'primary', run: openLogin }, { label: 'Plus tard', cls: 'ghost', run: closeSheet }],
+  });
+}
+
+async function openFriends(tab = friendsTab, prefill = '') {
+  friendsTab = tab;
+  if (!online) { friendsOffline(); return; }
+  openSheet({ cls: 'tall', kicker: 'Amis', title: 'Mes amis', body: '<p class="muted">Chargement…</p>' });
+  const res = tab === 'ranking' ? await social('ranking', { scope: rankingScope }) : await social('me');
+  if ($('#sheet').hidden || !$('#sheet h2') || !['Mes amis', 'Classement'].includes($('#sheet h2').textContent)) return; // fenêtre fermée entre-temps
+  if (!res.ok) { openSheet({ kicker: 'Amis', title: 'Mes amis', body: `<p class="muted">${esc(res.error || 'Serveur injoignable.')}</p>`, actions: [{ label: 'Réessayer', run: () => openFriends(tab) }] }); return; }
+  if (tab === 'ranking') return renderRanking(res.ranking);
+  renderFriends(res, prefill);
+}
+
+function friendsSeg(tab) {
+  return `<div class="seg"><button class="${tab === 'friends' ? 'on' : ''}" data-do="tab" data-arg="friends">${icon('users')} Amis</button>
+    <button class="${tab === 'ranking' ? 'on' : ''}" data-do="tab" data-arg="ranking">${icon('star')} Classement</button></div>`;
+}
+
+function friendRow(f) {
+  const stats = `<small>Niveau ${f.level} · ${f.prestige} ⭐${f.stars ? ` · ${'✦'.repeat(Math.min(5, f.stars))}` : ''}</small>`;
+  let btns;
+  if (f.status === 'incoming') {
+    btns = `<button class="btn small primary" data-do="accept" data-arg="${f.code}">Accepter</button>
+      <button class="btn small ghost" data-do="remove" data-arg="${f.code}">Refuser</button>`;
+  } else if (f.status === 'outgoing') {
+    btns = `<span class="muted f-wait">En attente</span><button class="btn small ghost" data-do="remove" data-arg="${f.code}">Annuler</button>`;
+  } else {
+    btns = `<button class="btn small" data-do="visit" data-arg="${f.code}">${icon('door')} Visiter</button>
+      <button class="btn small" data-do="egg" data-arg="${f.code}" ${friendsCanEgg ? '' : 'disabled'} title="Envoyer un Œuf surprise">🥚</button>`;
+  }
+  return `<div class="friend-card ${f.status}">
+    <div class="f-info"><b>${esc(f.name)}</b>${stats}</div>
+    <div class="f-btns">${btns}</div>
+    ${f.status === 'friend' ? `<button class="f-del" data-do="unfriend" data-arg="${f.code}" aria-label="Retirer ${esc(f.name)}">${icon('close')}</button>` : ''}
+  </div>`;
+}
+
+let friendsCanEgg = false;
+let friendsCache = [];
+
+function renderFriends(res, prefill = '') {
+  friendsCanEgg = res.canSendEgg;
+  friendsCache = res.friends;
+  const incoming = res.friends.filter((f) => f.status === 'incoming');
+  const outgoing = res.friends.filter((f) => f.status === 'outgoing');
+  const friends = res.friends.filter((f) => f.status === 'friend');
+  const badge = $('#friends-badge');
+  badge.hidden = !incoming.length;
+  badge.textContent = incoming.length;
+  openSheet({
+    cls: 'tall',
+    kicker: 'Amis',
+    title: 'Mes amis',
+    body: `${friendsSeg('friends')}
+      <div class="code-card"><div><small>Mon code ami</small><b>${fmtCode(res.me.code)}</b></div>
+        <button class="btn small primary" data-do="share" data-arg="${res.me.code}">${icon('users')} Inviter</button>
+        <button class="btn small" data-do="mywall" data-arg="${res.me.code}">💬 Mon mur</button></div>
+      <div class="add-friend"><input id="friend-code" maxlength="9" placeholder="Code de votre ami (ex. 1A2B 3C4D)" value="${esc(fmtCode(prefill))}" autocapitalize="characters" autocomplete="off">
+        <button class="btn primary" data-do="add">Ajouter</button></div>
+      ${incoming.length ? `<h3>Demandes reçues</h3><div class="friend-list">${incoming.map(friendRow).join('')}</div>` : ''}
+      <h3>Mes amis (${friends.length})</h3>
+      ${friends.length ? `<p class="muted">${friendsCanEgg ? '🥚 Vous pouvez envoyer un Œuf surprise aujourd’hui : il arrive dans la file de votre ami et ne paie pas, mais compte pour ses succès.' : '🥚 Œuf du jour déjà envoyé : prochain demain.'}</p>
+        <div class="friend-list">${friends.map(friendRow).join('')}</div>`
+        : '<p class="muted">Pas encore d’amis : partagez votre code ou entrez le leur ci-dessus.</p>'}
+      ${outgoing.length ? `<h3>Demandes envoyées</h3><div class="friend-list">${outgoing.map(friendRow).join('')}</div>` : ''}`,
+  });
+  bindFriendsClicks();
+  if (prefill) setTimeout(() => $('#friend-code')?.focus(), 60);
+}
+
+function renderRanking(list) {
+  openSheet({
+    cls: 'tall',
+    kicker: 'Amis',
+    title: 'Classement',
+    body: `${friendsSeg('ranking')}
+      <div class="seg small"><button class="${rankingScope === 'friends' ? 'on' : ''}" data-do="scope" data-arg="friends">Entre amis</button>
+        <button class="${rankingScope === 'all' ? 'on' : ''}" data-do="scope" data-arg="all">Tous les hôtels</button></div>
+      <p class="muted">Le prestige ⭐ se gagne avec les clients ravis, les Stars, les agrandissements et les missions.</p>
+      <ol class="rank-list">${list.map((r) => `<li class="${r.me ? 'me' : ''}">
+        <span class="r-rank">${r.rank <= 3 ? ['🥇', '🥈', '🥉'][r.rank - 1] : r.rank}</span>
+        <span class="r-name"><b>${esc(r.name)}${r.me ? ' (vous)' : ''}</b><small>Niveau ${r.level}</small></span>
+        <span class="r-fame">${r.prestige} ⭐</span>
+        ${r.me ? '' : `<button class="btn small ghost" data-do="visit" data-arg="${r.code}" aria-label="Visiter">${icon('door')}</button>`}</li>`).join('')}</ol>`,
+  });
+  bindFriendsClicks();
+}
+
+function bindFriendsClicks() {
+  const after = (res, okMsg) => { if (!res.ok) { toast(res.error, 'bad'); return false; } if (okMsg) toast(okMsg, 'good'); return true; };
+  onSheetClick({
+    tab: (t) => openFriends(t),
+    scope: (s) => { rankingScope = s; openFriends('ranking'); },
+    add: async () => {
+      const code = ($('#friend-code').value || '').replace(/\s/g, '');
+      if (!code) { toast('Entrez le code de votre ami.', 'bad'); return; }
+      const res = await social('request', { code });
+      if (after(res, res.accepted ? `${res.friend.name} et vous êtes maintenant amis !` : `Demande envoyée à ${res.friend?.name || 'cet hôtel'}.`)) openFriends('friends');
+    },
+    accept: async (code) => { const res = await social('accept', { code }); if (after(res, `${res.friend?.name} et vous êtes maintenant amis !`)) openFriends('friends'); },
+    remove: async (code) => { const res = await social('remove', { code }); if (after(res)) openFriends('friends'); },
+    unfriend: (code) => {
+      const f = friendsCache.find((x) => x.code === code);
+      confirmSheet('Retirer cet ami ?', `${esc(f ? f.name : 'Cet hôtel')} ne fera plus partie de vos amis.`, async () => {
+        const res = await social('remove', { code }); if (after(res)) openFriends('friends');
+      });
+    },
+    visit: (code) => enterVisit(code),
+    egg: (code) => sendEgg(code, () => openFriends('friends')),
+    share: (code) => shareInvite(code),
+    mywall: (code) => openWall(code),
+  });
+}
+
+async function sendEgg(code, then) {
+  const res = await social('egg', { code });
+  if (!res.ok) { toast(res.error, 'bad'); return; }
+  buzz(20);
+  toast('🥚 Œuf envoyé ! Il attend déjà dans la file de votre ami.', 'good');
+  if (res.state) adoptServerState(res.state);
+  if (visit) visit.canSendEgg = false;
+  if (then) then();
+}
+
+async function shareInvite(code) {
+  const url = inviteLink(code);
+  const text = `Viens me rendre visite dans mon hôtel PokéMotel ! Mon code ami : ${fmtCode(code)}`;
+  try {
+    if (navigator.share) { await navigator.share({ title: 'PokéMotel', text, url }); return; }
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    toast('Lien d’invitation copié : collez-le à vos amis.', 'good');
+  } catch { /* partage annulé */ }
+}
+
+// --- Visite --------------------------------------------------------------------------
+async function enterVisit(code) {
+  const res = await social('visit', { code });
+  if (!res.ok) { toast(res.error, 'bad'); return; }
+  if (res.mine) { toast('C’est votre hôtel !'); return; }
+  closeSheet();
+  if (!visit) home = state;
+  const me = await social('me');
+  visit = { ...res, canSendEgg: !!me.canSendEgg };
+  delete visit.state;
+  state = res.state;
+  selection = null;
+  tray = null;
+  switchHotel();
+  renderVisitBar();
+}
+
+function exitVisit() {
+  if (!visit) return;
+  visit = null;
+  state = home;
+  home = null;
+  switchHotel();
+  $('#visit-bar')?.remove();
+}
+
+/** Après un changement d'hôtel affiché : tout est redessiné, sans fêter de « gains ». */
+function switchHotel() {
+  document.body.classList.toggle('visiting', !!visit);
+  layoutKey = '';
+  roomKeys.clear();
+  prevSats.clear();
+  hudPrev = null;
+  soundSeq = state.logSeq;
+  closeCtx();
+  render();
+  if (camera) requestAnimationFrame(() => camera.fit($('#building')));
+}
+
+function renderVisitBar() {
+  let bar = $('#visit-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'visit-bar';
+    bar.className = 'visit-bar';
+    $('#scene').appendChild(bar);
+    bar.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-v]');
+      if (!b || !visit) return;
+      const k = b.dataset.v;
+      if (k === 'home') exitVisit();
+      if (k === 'wall') openWall(visit.hotel.code);
+      if (k === 'egg') sendEgg(visit.hotel.code, renderVisitBar);
+      if (k === 'like') {
+        const r = await social('like', { code: visit.hotel.code });
+        if (!r.ok) { toast(r.error, 'bad'); return; }
+        Object.assign(visit, { likes: r.likes, liked: r.liked, wall: r.wall });
+        if (r.liked) buzz(15);
+        renderVisitBar();
+      }
+    });
+  }
+  const v = visit;
+  bar.innerHTML = `<div class="vb-title"><small>En visite</small><b>${esc(v.hotel.name)}</b><span>Niveau ${v.hotel.level} · ${v.hotel.prestige} ⭐</span></div>
+    <div class="vb-btns">
+      <button class="vb-btn${v.liked ? ' on' : ''}" data-v="like" aria-label="J’aime">${v.liked ? '❤️' : '🤍'}<b>${v.likes}</b></button>
+      <button class="vb-btn" data-v="wall" aria-label="Mur">💬<b>${v.wall.length}</b></button>
+      ${v.friend ? `<button class="vb-btn" data-v="egg" ${v.canSendEgg ? '' : 'disabled'} aria-label="Envoyer un Œuf">🥚</button>` : ''}
+      <button class="vb-btn home" data-v="home">${icon('door')}<b>Rentrer</b></button>
+    </div>`;
+}
+
+// --- Mur -----------------------------------------------------------------------------
+async function openWall(code, data = null) {
+  const res = data || await social('visit', { code });
+  if (!res.ok) { toast(res.error, 'bad'); return; }
+  const canWrite = res.mine || res.friend;
+  const ago = (iso) => {
+    const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+    if (m < 1) return 'à l’instant';
+    if (m < 60) return `il y a ${m} min`;
+    if (m < 1440) return `il y a ${Math.round(m / 60)} h`;
+    return `il y a ${Math.round(m / 1440)} j`;
+  };
+  openSheet({
+    cls: 'tall',
+    kicker: `${res.likes} ❤️ · ${res.wall.length} message${res.wall.length > 1 ? 's' : ''}`,
+    title: res.mine ? 'Mon mur' : `Le mur de ${esc(res.hotel.name)}`,
+    body: `${canWrite ? `<div class="wall-write"><textarea id="wall-text" maxlength="200" rows="2" placeholder="${res.mine ? 'Un mot pour vos visiteurs…' : 'Un petit mot pour votre ami…'}"></textarea>
+        <button class="btn primary" data-do="post">Publier</button></div>` : '<p class="muted">Seuls les amis de cet hôtel peuvent écrire sur son mur.</p>'}
+      ${res.wall.length ? `<ul class="wall-list">${res.wall.map((p) => `<li><div class="w-head"><b>${esc(p.author ? p.author.name : 'Ancien joueur')}</b><small>${ago(p.at)}</small>
+          ${p.canDelete ? `<button class="w-del" data-do="unpost" data-arg="${p.id}" aria-label="Effacer">${icon('trash')}</button>` : ''}</div><p>${esc(p.body)}</p></li>`).join('')}</ul>`
+        : '<p class="muted">Aucun message pour l’instant.</p>'}`,
+  });
+  const refresh = (r) => {
+    if (!r.ok) { toast(r.error, 'bad'); return; }
+    const next = { ...res, wall: r.wall, likes: r.likes, liked: r.liked };
+    if (visit && visit.hotel.code === code) { Object.assign(visit, { wall: r.wall, likes: r.likes, liked: r.liked }); renderVisitBar(); }
+    openWall(code, next);
+  };
+  onSheetClick({
+    post: async () => { const text = $('#wall-text').value; if (!text.trim()) return; refresh(await social('post', { code, text })); },
+    unpost: (id) => confirmSheet('Effacer ce message ?', 'Il disparaîtra du mur.', async () => refresh(await social('unpost', { id: Number(id) }))),
+  });
+}
+
+/** Lien d'invitation (?ami=CODE) : on l'ouvre une fois connecté. */
+function handleInviteLink() {
+  const params = new URLSearchParams(location.search);
+  const code = (params.get('ami') || prefs.get('pendingFriend', '') || '').toUpperCase().replace(/[^0-9A-F]/g, '').slice(0, 8);
+  if (params.has('ami')) {
+    params.delete('ami');
+    history.replaceState(history.state, '', `${location.pathname}${params.toString() ? `?${params}` : ''}${location.hash}`);
+  }
+  if (code.length !== 8) return;
+  prefs.set('pendingFriend', code);
+  if (!online) toast('Connectez-vous pour ajouter cet ami (Bureau › Jouer en ligne).');
+}
+
+/** Ouvre la fenêtre Amis pour un lien d'invitation reçu, dès qu'aucune autre fenêtre n'attend. */
+function maybePendingFriend() {
+  const code = prefs.get('pendingFriend', '');
+  if (!code || !online || visit || !$('#sheet').hidden || (state.notices && state.notices.length)) return;
+  prefs.set('pendingFriend', '');
+  openFriends('friends', code);
+}
+
 // Mises à jour : à chaque publication (VERSION de sw.js incrémentée), le nouveau
 // service worker prend la main sur les jeux ouverts. On recharge alors tout seul si le
 // jeu est en arrière-plan (au retour, il est à jour), sinon un bandeau propose de le
