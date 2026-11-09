@@ -711,7 +711,7 @@ function roomView(room, t, occ, sats) {
   if (g && g.leisure) {
     html += `<div class="out-note">${icon('door')}<span>En sortie<br><small>${esc(BUILDABLES[state.rooms[g.leisure.roomId]?.sub]?.name || '')}</small></span></div>`;
   } else if (g) {
-    html += `<div class="occupant walker-in ${g.type === 'spectre' ? 'float' : ''}${screaming ? ' shaking' : ''}" style="${occupantStyle(g)}">${creatureSVG(g, mood)}</div>`;
+    html += `<div class="occupant walker-in ${g.type === 'spectre' ? 'float' : ''}${screaming ? ' shaking' : ''}" style="${occupantStyle(g)}">${emitParticles(g)}${creatureSVG(g, mood)}</div>`;
     if (screaming) html += '<span class="scream">HURLE&nbsp;!</span>';
   }
   if (g) {
@@ -842,7 +842,8 @@ function likeSentence(g) {
   s += s ? '. ' : '';
   const em = guestAuras(g);
   const who = g.species && SPECIES[g.species] ? SPECIES[g.species].name : 'Il';
-  s += em.length ? `${who} ${em.map((a) => EMIT_PHRASES[a] || `dégage ${AURAS[a].name.toLowerCase()}`).join(' et ')}.` : `${who} ne dégage rien autour de lui.`;
+  const phrase = (a, i) => { const list = EMIT_PHRASES[a]; return list ? list[(Math.abs(g.look || 0) + i * 7) % list.length] : `dégage ${AURAS[a].name.toLowerCase()}`; };
+  s += em.length ? `${who} ${em.map(phrase).join(' et ')}.` : `${who} ne dégage rien autour de lui.`;
   return s;
 }
 
@@ -2007,6 +2008,26 @@ function ctxContent(room) {
   // En visite : on regarde, on ne touche à rien.
   if (visit) A.splice(0, A.length, ...A.filter((a) => a.ico === 'scroll'));
   return { head, actions: A };
+}
+
+/**
+ * Particules autour d'un Pokémon selon ce qu'il dégage : gouttes (humidité), ondes
+ * de chaleur, volutes vertes (odeurs), flocons (froid), notes (bruit).
+ */
+const PARTICLE_SVG = {
+  humidite: '<svg viewBox="0 0 10 14"><path d="M5 .5 C5 .5 .6 6.6 .6 9.3 A4.4 4.4 0 0 0 9.4 9.3 C9.4 6.6 5 .5 5 .5z" fill="#7cc8ff" stroke="#2f7fc4" stroke-width="1"/><ellipse cx="3.6" cy="9" rx="1" ry="1.6" fill="#fff" opacity=".8"/></svg>',
+  chaleur: '<svg viewBox="0 0 10 16"><path d="M5 15 q-4 -3.5 0 -7 q4 -3.5 0 -7" fill="none" stroke="#ff7a2e" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  odeur: '<svg viewBox="0 0 14 16"><path d="M4 15 q-4 -3.5 0 -7 q4 -3.5 0 -7 M10 15 q-4 -3.5 0 -7 q4 -3.5 0 -7" fill="none" stroke="#7bbf3a" stroke-width="2" stroke-linecap="round"/></svg>',
+  froid: '<svg viewBox="0 0 14 14"><g stroke="#9fe6ff" stroke-width="1.8" stroke-linecap="round"><path d="M7 1 V13 M1.8 4 L12.2 10 M1.8 10 L12.2 4"/></g><circle cx="7" cy="7" r="1.6" fill="#fff"/></svg>',
+  bruit: '<svg viewBox="0 0 12 16"><path d="M4 12.5 V2.5 L11 1 V11" fill="none" stroke="#5b3fc4" stroke-width="1.8" stroke-linejoin="round"/><ellipse cx="2.6" cy="12.8" rx="2.4" ry="1.9" fill="#5b3fc4"/><ellipse cx="9.6" cy="11.3" rx="2.4" ry="1.9" fill="#5b3fc4"/></svg>',
+};
+function emitParticles(g) {
+  const em = guestAuras(g).filter((a) => PARTICLE_SVG[a]);
+  if (!em.length) return '';
+  const per = em.length > 1 ? 2 : 3;
+  let out = '';
+  em.forEach((a, k) => { for (let i = 0; i < per; i++) out += `<i class="pt pt-${a}" style="--i:${i + k * per}">${PARTICLE_SVG[a]}</i>`; });
+  return `<span class="particles" aria-hidden="true">${out}</span>`;
 }
 
 /** Une ligne qui explique la note : « 3 de base +2 Compagnie −3 sans Chaleur… ». */

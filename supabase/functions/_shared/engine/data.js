@@ -199,13 +199,16 @@ export const NATURES = {
 };
 export const NATURE_IDS = Object.keys(NATURES);
 
-/** Phrase de la fiche pour ce qu'un Pokémon dégage. */
+/**
+ * Phrases de la fiche pour ce qu'un Pokémon dégage (comme dans CroqueMotel :
+ * plusieurs formulations par effet, une choisie pour chaque client).
+ */
 export const EMIT_PHRASES = {
-  chaleur: 'dégage énormément de chaleur',
-  humidite: 'dégage beaucoup d’humidité',
-  odeur: 'dégage une odeur tenace',
-  froid: 'répand un froid glacial',
-  bruit: 'fait beaucoup de bruit',
+  chaleur: ['dégage énormément de chaleur', 'irradie une chaleur étouffante', 'réchauffe toute la pièce', 'fait grimper le thermomètre'],
+  humidite: ['dégage beaucoup d’humidité', 'dégouline en permanence', 'laisse des flaques partout', 'transforme sa chambre en hammam'],
+  odeur: ['dégage une odeur tenace', 'sent les égouts', 'embaume tout le couloir… et pas en bien', 'laisse un fumet persistant derrière lui'],
+  froid: ['répand un froid glacial', 'givre les fenêtres', 'fait claquer des dents ses voisins', 'transforme sa chambre en frigo'],
+  bruit: ['fait beaucoup de bruit', 'ronfle comme un camion', 'n’arrête pas de chanter', 'fait trembler les murs'],
 };
 
 /** Nom affichable d'un type (y compris Acier, Sol, Fée). */
