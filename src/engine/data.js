@@ -83,9 +83,133 @@ export const AURA_TYPE = { chaleur: 'feu', humidite: 'eau', odeur: 'poison', fro
 
 /** Les deux premiers clients sont composés à la main (comme dans CroqueMotel). */
 export const STARTERS = [
-  { type: 'poison', likes: ['chaleur', 'voisinage'], dislikes: [] },
-  { type: 'feu', likes: ['odeur', 'voisinage'], dislikes: [] },
+  { type: 'poison', species: 'abo', emits: ['odeur'], likes: ['chaleur', 'voisinage'], dislikes: [] },
+  { type: 'feu', species: 'salameche', emits: ['chaleur'], likes: ['odeur', 'voisinage'], dislikes: [] },
 ];
+
+// -----------------------------------------------------------------------------
+// Espèces, ce qu'elles dégagent, natures
+//
+// Comme dans CroqueMotel, trois choses distinctes par client :
+//  - le COMPORTEMENT vient du type (premier type de l'espèce) : Feu = Pyromane… ;
+//  - ce qu'il DÉGAGE est tiré à son arrivée parmi ce qui va avec ses types ;
+//  - ses GOÛTS viennent de sa nature (Timide : aime la Chaleur, déteste le Bruit).
+// -----------------------------------------------------------------------------
+
+/**
+ * Ce que chaque type peut faire dégager (le premier est le plus fréquent).
+ * Acier, Sol et Fée n'existent qu'en second type : ils n'apportent pas de
+ * comportement, seulement ce qu'ils dégagent.
+ */
+export const TYPE_EMITS = {
+  feu: ['chaleur', 'odeur', 'bruit'],
+  eau: ['humidite', 'froid', 'bruit'],
+  poison: ['odeur', 'humidite'],
+  electrik: ['bruit', 'chaleur'],
+  glace: ['froid', 'humidite'],
+  roche: ['froid', 'bruit'],
+  normal: ['bruit', 'odeur', 'chaleur'],
+  insecte: ['bruit', 'odeur'],
+  psy: ['chaleur', 'froid'],
+  combat: ['odeur', 'chaleur', 'bruit'],
+  plante: ['humidite', 'odeur', 'chaleur'],
+  spectre: [],
+  acier: ['froid', 'bruit'],
+  sol: ['odeur', 'bruit'],
+  fee: ['chaleur', 'odeur'],
+};
+
+/** Types qui n'existent qu'en second type (affichage). */
+export const EXTRA_TYPES = {
+  acier: { id: 'acier', name: 'Acier', icon: '⚙️', color: '#9aa7b8' },
+  sol: { id: 'sol', name: 'Sol', icon: '⛰️', color: '#c9a35a' },
+  fee: { id: 'fee', name: 'Fée', icon: '✨', color: '#f4a6d7' },
+};
+
+/** Niveau d'hôtel à partir duquel une espèce à double type dégage deux choses. */
+export const DUAL_TYPE_LEVEL = 5;
+
+/** Espèces : nom, types, planche de sprites (assets/sprites/<sprite>.png). */
+export const SPECIES = {
+  carapuce: { id: 'carapuce', name: 'Carapuce', types: ['eau'], sprite: 'eau' },
+  psykokwak: { id: 'psykokwak', name: 'Psykokwak', types: ['eau'], sprite: 'eau1' },
+  ptitard: { id: 'ptitard', name: 'Ptitard', types: ['eau'], sprite: 'eau2' },
+  kokiyas: { id: 'kokiyas', name: 'Kokiyas', types: ['eau'], sprite: 'eau3' },
+  magicarpe: { id: 'magicarpe', name: 'Magicarpe', types: ['eau'], sprite: 'eau4' },
+  otaria: { id: 'otaria', name: 'Otaria', types: ['eau'], sprite: 'glace' },
+  salameche: { id: 'salameche', name: 'Salamèche', types: ['feu'], sprite: 'feu' },
+  ponyta: { id: 'ponyta', name: 'Ponyta', types: ['feu'], sprite: 'feu1' },
+  goupix: { id: 'goupix', name: 'Goupix', types: ['feu'], sprite: 'feu2' },
+  magmar: { id: 'magmar', name: 'Magmar', types: ['feu'], sprite: 'feu3' },
+  abo: { id: 'abo', name: 'Abo', types: ['poison'], sprite: 'poison1' },
+  tadmorv: { id: 'tadmorv', name: 'Tadmorv', types: ['poison'], sprite: 'poison2' },
+  rattata: { id: 'rattata', name: 'Rattata', types: ['normal'], sprite: 'normal' },
+  metamorph: { id: 'metamorph', name: 'Métamorph', types: ['normal'], sprite: 'normal1' },
+  evoli: { id: 'evoli', name: 'Évoli', types: ['normal'], sprite: 'normal2' },
+  pikachu: { id: 'pikachu', name: 'Pikachu', types: ['electrik'], sprite: 'electrik' },
+  voltorbe: { id: 'voltorbe', name: 'Voltorbe', types: ['electrik'], sprite: 'electrik2' },
+  elektek: { id: 'elektek', name: 'Élektek', types: ['electrik'], sprite: 'electrik3' },
+  magneti: { id: 'magneti', name: 'Magnéti', types: ['electrik', 'acier'], sprite: 'electrik1' },
+  ferosinge: { id: 'ferosinge', name: 'Férosinge', types: ['combat'], sprite: 'combat' },
+  machoc: { id: 'machoc', name: 'Machoc', types: ['combat'], sprite: 'combat1' },
+  soporifik: { id: 'soporifik', name: 'Soporifik', types: ['psy'], sprite: 'psy2' },
+  mmime: { id: 'mmime', name: 'M. Mime', types: ['psy', 'fee'], sprite: 'psy1' },
+  chenipan: { id: 'chenipan', name: 'Chenipan', types: ['insecte'], sprite: 'insecte' },
+  aspicot: { id: 'aspicot', name: 'Aspicot', types: ['insecte', 'poison'], sprite: 'insecte1' },
+  mimitoss: { id: 'mimitoss', name: 'Mimitoss', types: ['insecte', 'poison'], sprite: 'poison' },
+  lippoutou: { id: 'lippoutou', name: 'Lippoutou', types: ['glace', 'psy'], sprite: 'glace1' },
+  racaillou: { id: 'racaillou', name: 'Racaillou', types: ['roche', 'sol'], sprite: 'roche' },
+  mystherbe: { id: 'mystherbe', name: 'Mystherbe', types: ['plante', 'poison'], sprite: 'plante' },
+  fantominus: { id: 'fantominus', name: 'Fantominus', types: ['spectre', 'poison'], sprite: 'spectre' },
+};
+export const SPECIES_IDS = Object.keys(SPECIES);
+
+/**
+ * Natures : comme dans Pokémon, chacune favorise une statistique et en pénalise
+ * une autre. Ici : Attaque = Bruit, Défense = Froid, Vitesse = Chaleur,
+ * Attaque Spéciale = Odeurs, Défense Spéciale = Humidité. Les 5 natures neutres
+ * aiment simplement la compagnie.
+ */
+export const NATURES = {
+  solo: { name: 'Solo', like: 'bruit', dislike: 'froid' },
+  rigide: { name: 'Rigide', like: 'bruit', dislike: 'odeur' },
+  mauvais: { name: 'Mauvais', like: 'bruit', dislike: 'humidite' },
+  brave: { name: 'Brave', like: 'bruit', dislike: 'chaleur' },
+  assure: { name: 'Assuré', like: 'froid', dislike: 'bruit' },
+  malin: { name: 'Malin', like: 'froid', dislike: 'odeur' },
+  lache: { name: 'Lâche', like: 'froid', dislike: 'humidite' },
+  relax: { name: 'Relax', like: 'froid', dislike: 'chaleur' },
+  timide: { name: 'Timide', like: 'chaleur', dislike: 'bruit' },
+  presse: { name: 'Pressé', like: 'chaleur', dislike: 'froid' },
+  jovial: { name: 'Jovial', like: 'chaleur', dislike: 'odeur' },
+  naif: { name: 'Naïf', like: 'chaleur', dislike: 'humidite' },
+  modeste: { name: 'Modeste', like: 'odeur', dislike: 'bruit' },
+  doux: { name: 'Doux', like: 'odeur', dislike: 'froid' },
+  foufou: { name: 'Foufou', like: 'odeur', dislike: 'humidite' },
+  discret: { name: 'Discret', like: 'odeur', dislike: 'chaleur' },
+  calme: { name: 'Calme', like: 'humidite', dislike: 'bruit' },
+  gentil: { name: 'Gentil', like: 'humidite', dislike: 'froid' },
+  prudent: { name: 'Prudent', like: 'humidite', dislike: 'odeur' },
+  malpoli: { name: 'Malpoli', like: 'humidite', dislike: 'chaleur' },
+  hardi: { name: 'Hardi', like: 'voisinage', dislike: null },
+  docile: { name: 'Docile', like: 'voisinage', dislike: null },
+  serieux: { name: 'Sérieux', like: 'voisinage', dislike: null },
+  pudique: { name: 'Pudique', like: 'voisinage', dislike: null },
+  bizarre: { name: 'Bizarre', like: 'voisinage', dislike: null },
+};
+export const NATURE_IDS = Object.keys(NATURES);
+
+/** Phrase de la fiche pour ce qu'un Pokémon dégage. */
+export const EMIT_PHRASES = {
+  chaleur: 'dégage énormément de chaleur',
+  humidite: 'dégage beaucoup d’humidité',
+  odeur: 'dégage une odeur tenace',
+  froid: 'répand un froid glacial',
+  bruit: 'fait beaucoup de bruit',
+};
+
+/** Nom affichable d'un type (y compris Acier, Sol, Fée). */
+export const typeName = (id) => (TYPES[id] || EXTRA_TYPES[id] || { name: id }).name;
 
 // -----------------------------------------------------------------------------
 // Services en chambre et pièces constructibles
@@ -312,23 +436,6 @@ export const CONFIG = {
   maxCatchUpEvents: 20000,
 };
 
-// -----------------------------------------------------------------------------
-// Noms PROVISOIRES (générés par syllabes selon le type) — à remplacer.
-// -----------------------------------------------------------------------------
-export const NAME_PARTS = {
-  normal:   { pre: ['Ronfl', 'Dodu', 'Bâill', 'Poupl', 'Grass'],     suf: ['ard', 'on', 'ouille', 'in', 'eau'] },
-  feu:      { pre: ['Brais', 'Tison', 'Cendr', 'Flamm', 'Brûl'],      suf: ['ille', 'ot', 'ard', 'ette', 'in'] },
-  eau:      { pre: ['Clapot', 'Flaqu', 'Goutt', 'Ondul', 'Ruiss'],    suf: ['in', 'ette', 'eau', 'on', 'y'] },
-  plante:   { pre: ['Mousser', 'Feuill', 'Bourgeon', 'Ronc', 'Lier'], suf: ['on', 'ette', 'ard', 'in', 'ot'] },
-  electrik: { pre: ['Zapp', 'Volt', 'Étincel', 'Bzz', 'Ampér'],       suf: ['ou', 'ette', 'in', 'ard', 'y'] },
-  glace:    { pre: ['Givr', 'Frim', 'Glaç', 'Grél', 'Banquis'],       suf: ['ou', 'on', 'ette', 'in', 'ard'] },
-  poison:   { pre: ['Puant', 'Moisi', 'Vas', 'Toxi', 'Fang'],         suf: ['ou', 'ard', 'ette', 'in', 'ot'] },
-  spectre:  { pre: ['Frouss', 'Brum', 'Ombr', 'Hant', 'Spectr'],      suf: ['ou', 'ine', 'on', 'elle', 'in'] },
-  roche:    { pre: ['Cailloux', 'Galet', 'Rocaill', 'Granit', 'Moell'], suf: ['on', 'ou', 'ard', 'in', 'ot'] },
-  insecte:  { pre: ['Bzzt', 'Cafard', 'Scarab', 'Moucher', 'Grill'],   suf: ['on', 'ette', 'in', 'ou', 'y'] },
-  psy:      { pre: ['Hypn', 'Songe', 'Rêv', 'Médit', 'Pendul'],      suf: ['o', 'ette', 'ine', 'on', 'ou'] },
-  combat:   { pre: ['Cogn', 'Baff', 'Tatan', 'Bourr', 'Castagn'],     suf: ['ard', 'eur', 'ou', 'in', 'ette'] },
-};
 export const STAFF_NAMES = ['Gaston', 'Josiane', 'Marcel', 'Huguette', 'Raymond', 'Ginette', 'Lucien', 'Odette', 'Firmin', 'Paulette'];
 export const HOTEL_NAMES = {
   pre: ['Taudis', 'Refuge', 'Motel', 'Repaire', 'Pension', 'Auberge', 'Gîte'],

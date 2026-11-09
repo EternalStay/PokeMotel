@@ -5,7 +5,7 @@
 // =============================================================================
 
 import { spriteSVG } from './sprites.js';
-import { TYPES, WALL_COLORS, floorDeco } from '../engine/index.js';
+import { TYPES, SPECIES, WALL_COLORS, floorDeco } from '../engine/index.js';
 
 // -----------------------------------------------------------------------------
 // Utilitaires
@@ -123,7 +123,7 @@ export function occupantStyle(g) {
 export function creatureSVG(g, mood = 'good', extraClass = '') {
   // Le décalage suit l'horloge : un Pokémon redessiné reprend là où il en était,
   // et chacun a sa propre phase.
-  const sprite = spriteSVG(g.type, g.look || 0, extraClass, animPhase(g) * 60 + Date.now() / 1000);
+  const sprite = spriteSVG(g.type, g.look || 0, extraClass, animPhase(g) * 60 + Date.now() / 1000, g.species && SPECIES[g.species] ? SPECIES[g.species].sprite : null);
   if (sprite) return sprite;
   const t = TYPES[g.type];
   const look = g.look || 0;

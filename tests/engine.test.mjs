@@ -5,7 +5,7 @@ import {
   CONFIG, createState, advance, computeSatisfaction, previewPlacement, placeGuest, moveGuest, buildRoom,
   localToUtc, nextLocalHour, zonedParts, occupancy, assignStaff, useItem, fulfillRequest, collectLeftover,
   extendRoom, upgradeRoom, hireStaff, collectTax, taxAmount, generateGuest, nightGain, firstTaxAmount, extendCost,
-  TYPES,
+  TYPES, SPECIES, NATURES, TYPE_EMITS, naturesFor,
 } from '../src/engine/index.js';
 
 const TZ = CONFIG.timeZone;
@@ -149,8 +149,19 @@ test('clients générés : types et goûts selon le niveau', () => {
   for (let i = 0; i < 200; i++) {
     const g = generateGuest(s, s.time);
     assert.ok(TYPES[g.type].unlock <= 1);
-    assert.equal(g.likes.length + g.dislikes.length, 2);
-    for (const a of [...g.likes, ...g.dislikes]) assert.ok(['humidite', 'chaleur', 'odeur'].includes(a));
+    // Goûts = ceux de sa nature : 1 aimé + 1 détesté, ou « aime la compagnie » (neutre).
+    const nat = NATURES[g.nature];
+    assert.ok(nat, 'une nature');
+    assert.deepEqual(g.likes, [nat.like]);
+    assert.deepEqual(g.dislikes, nat.dislike ? [nat.dislike] : []);
+    for (const a of [...g.likes, ...g.dislikes]) assert.ok(['humidite', 'chaleur', 'odeur', 'voisinage'].includes(a));
+    // Espèce du bon type, à un seul type au début ; ce qu'il dégage est connu des goûts.
+    const sp = SPECIES[g.species];
+    assert.equal(sp.types[0], g.type);
+    assert.equal(sp.types.length, 1);
+    assert.equal(g.emits.length, 1);
+    assert.ok(['humidite', 'chaleur', 'odeur'].includes(g.emits[0]));
+    assert.ok(g.name.startsWith(sp.name));
     assert.equal(g.stay, 1);
   }
   s.hotel.level = 6;
@@ -158,6 +169,37 @@ test('clients générés : types et goûts selon le niveau', () => {
   for (let i = 0; i < 400; i++) types.add(generateGuest(s, s.time).type);
   assert.equal(types.size, 11); // tout sauf l'Électrik (niveau 7)
   assert.ok(!types.has('electrik'));
+});
+
+test('espèces : ce qu’elles dégagent varie, double type à partir du niveau 5', () => {
+  const s = blank(at(2026, 11, 10, 12));
+  s.nextGuestId = 10;
+  s.hotel.level = 7;
+  const fire = new Set();
+  let dual = 0;
+  for (let i = 0; i < 600; i++) {
+    const g = generateGuest(s, s.time);
+    const sp = SPECIES[g.species];
+    if (g.type === 'feu') g.emits.forEach((a) => fire.add(a));
+    if (g.type === 'spectre') assert.deepEqual(g.emits, [], 'Invisible : rien');
+    if (g.type === 'plante') assert.equal(g.emits.length, 2, 'Monstro-plante : deux choses');
+    if (sp.types.length === 2 && !['spectre', 'plante'].includes(g.type)) { dual++; assert.equal(g.emits.length, 2); assert.notEqual(g.emits[0], g.emits[1]); }
+    for (const a of g.emits) assert.ok([...TYPE_EMITS[sp.types[0]], ...(TYPE_EMITS[sp.types[1]] || [])].includes(a));
+  }
+  assert.ok(fire.size >= 2, 'deux Pokémon Feu ne dégagent pas forcément la même chose');
+  assert.ok(dual > 0);
+  // Avant le niveau 5 : une seule chose, même pour Racaillou (Roche/Sol).
+  s.hotel.level = 3;
+  for (let i = 0; i < 200; i++) { const g = generateGuest(s, s.time); if (g.type !== 'plante') assert.ok(g.emits.length <= 1); }
+});
+
+test('natures : 25, goûts cohérents, débloquées selon le niveau', () => {
+  assert.equal(Object.keys(NATURES).length, 25);
+  assert.equal(Object.values(NATURES).filter((n) => !n.dislike).length, 5);
+  assert.deepEqual([NATURES.timide.like, NATURES.timide.dislike], ['chaleur', 'bruit']);
+  const lvl1 = naturesFor(1);
+  assert.ok(lvl1.every((id) => ['humidite', 'chaleur', 'odeur', 'voisinage'].includes(NATURES[id].like)));
+  assert.ok(naturesFor(2).length === 25);
 });
 
 test('personnel : réparation et petites attentions (4 h, 40 %)', () => {
@@ -337,6 +379,20 @@ test('événements : un événement modifie un client et en reprogramme un autre
   assert.ok(s.notices.length > 0);
 });
 
+test('migration v9 → v10 : les clients déjà là gardent ce qu’ils dégagent et leurs goûts', () => {
+  const s = createState(at(2026, 11, 10, 12), 9);
+  const g = Object.values(s.guests)[0];
+  delete g.species; delete g.emits; delete g.nature;
+  g.type = 'feu'; g.likes = ['odeur']; g.dislikes = ['humidite'];
+  s.v = 9;
+  const m = migrate(s);
+  const h = m.guests[g.id];
+  assert.equal(SPECIES[h.species].types[0], 'feu');
+  assert.deepEqual(h.emits, ['chaleur']);
+  assert.deepEqual([h.likes, h.dislikes], [['odeur'], ['humidite']]);
+  assert.equal(h.nature, null);
+});
+
 test('migration d\'une sauvegarde v3', () => {
   const s = createState(at(2026, 11, 10, 12), 9);
   s.v = 3;
@@ -344,7 +400,7 @@ test('migration d\'une sauvegarde v3', () => {
   for (const g of Object.values(s.guests)) delete g.mods.malus;
   const m = migrate(s);
   assert.ok(m && m.quest && m.research);
-  assert.equal(m.v, 9);
+  assert.equal(m.v, 10);
   assert.equal(m.rooms['0-2'].kind, 'lobby');
   assert.equal(m.gems, 0);
   assert.ok(renameHotel(m, 'Test').ok);
@@ -404,6 +460,7 @@ test('Matelas : +1 à chaque nuit ; feux d\'artifice : +6 puis la chambre saute'
   s.hotel.level = 4;
   s.rooms['1-0'].equip = ['matelas'];
   s.rooms['2-2'].equip = ['feux', 'radiateur'];
+  s.nextEventAt = Infinity; // pas d'imprévu (accident…) pendant le test
   const g = guest(s, { type: 'eau', roomId: '1-0', stay: 3, nightsLeft: 3 });
   const f = guest(s, { type: 'eau', roomId: '2-2', stay: 3, nightsLeft: 3 });
   advance(s, at(2026, 11, 11, 0, 5));

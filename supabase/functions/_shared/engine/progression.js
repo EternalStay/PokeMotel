@@ -9,10 +9,10 @@
 //   - un événement aléatoire toutes les 9 à 21 h, selon le niveau de l'hôtel.
 // =============================================================================
 
-import { AURAS, CONFIG, ITEMS, ITEM_IDS, CURRENCY, GEMS, tastePool } from './data.js';
+import { AURAS, CONFIG, ITEMS, ITEM_IDS, CURRENCY, GEMS, NATURES, SPECIES } from './data.js';
 import { rngFor } from './rng.js';
 import { HOUR, MINUTE } from './time.js';
-import { addLog, enqueueNewGuest, occupancy, removeGuest, roomLabel } from './model.js';
+import { addLog, enqueueNewGuest, occupancy, removeGuest, roomLabel, naturesFor } from './model.js';
 import { bumpGoal } from './achievements.js';
 
 // -----------------------------------------------------------------------------
@@ -346,14 +346,15 @@ export function runEvent(state, t) {
       break;
     }
     case 'sblurb': {
-      const pool = tastePool(lvl);
-      const n = rng.int(0, 2);
-      const p = [...pool];
-      const drawn = [];
-      for (let i = 0; i < 2; i++) drawn.push(p.splice(Math.floor(rng.next() * p.length), 1)[0]);
-      g.likes = drawn.slice(0, n);
-      g.dislikes = drawn.slice(n);
-      notice(`Un sblurb a attaqué ${g.name} (chambre ${roomLabel(room)}) : lavage de cerveau complet, ses goûts ont changé ! (aime : ${g.likes.map((a) => AURAS[a].name).join(', ') || 'rien'} ; déteste : ${g.dislikes.map((a) => AURAS[a].name).join(', ') || 'rien'})`, 'bad');
+      // Lavage de cerveau : il change de nature, donc de goûts.
+      const old = g.nature ? NATURES[g.nature].name : null;
+      const choices = naturesFor(lvl).filter((id) => id !== g.nature);
+      const nat = rng.pick(choices.length ? choices : naturesFor(lvl));
+      g.nature = nat;
+      g.likes = [NATURES[nat].like];
+      g.dislikes = NATURES[nat].dislike ? [NATURES[nat].dislike] : [];
+      if (g.species && SPECIES[g.species]) g.name = `${SPECIES[g.species].name} ${NATURES[nat].name}`;
+      notice(`Un sblurb a attaqué ${g.name} (chambre ${roomLabel(room)}) : lavage de cerveau complet${old ? `, il n'est plus ${old}` : ''} ! Nature ${NATURES[nat].name} : aime ${AURAS[g.likes[0]].name}${g.dislikes.length ? `, déteste ${AURAS[g.dislikes[0]].name}` : ''}.`, 'bad');
       break;
     }
     default:

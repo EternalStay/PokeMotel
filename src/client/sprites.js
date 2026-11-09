@@ -51,7 +51,7 @@ function makeSheet(name, img, type) {
   const fh = cfg.frameH ?? (available === 1 ? H : fw);
   const frames = [];
   for (let r = 0; r < rows; r++) for (let c = 0; c < cfg.cols; c++) frames.push(`${c * fw} ${r * fh} ${fw} ${fh}`);
-  return { ...cfg, src: img.src, w: W, h: H, frames };
+  return { ...cfg, name, src: img.src, w: W, h: H, frames };
 }
 
 /** Cherche les planches de chaque type ; `onReady` est rappelé quand un type en a trouvé. */
@@ -82,11 +82,14 @@ const PLACEHOLDER = '<svg class="creature sprite loading" viewBox="0 0 64 64" ar
  * SVG animé du Pokémon (planche choisie selon `look`) ; une place vide tant que
  * les planches de son type se chargent ; null si ce type n'a aucune planche.
  */
-export function spriteSVG(type, look = 0, extraClass = '', delay = 0) {
-  if (pending.has(type)) return PLACEHOLDER;
+export function spriteSVG(type, look = 0, extraClass = '', delay = 0, file = null) {
+  // Planche de l'espèce (ex. 'feu1' pour Ponyta), sinon une variante du type selon `look`.
+  const folder = file ? file.replace(/\d+$/, '') : type;
+  if (pending.has(folder) || pending.has(type)) return PLACEHOLDER;
+  const own = file && (sheets[folder] || []).find((x) => x.name === file);
   const list = sheets[type];
-  if (!list) return null;
-  const s = list[Math.abs(look) % list.length];
+  if (!own && !list) return null;
+  const s = own || list[Math.abs(look) % list.length];
   const dur = (s.frames.length * s.frameMs) / 1000;
   return `<svg class="creature sprite ${extraClass}" viewBox="0 0 64 64" aria-hidden="true">
     <svg width="64" height="64" viewBox="${s.frames[0]}" preserveAspectRatio="xMidYMax meet">

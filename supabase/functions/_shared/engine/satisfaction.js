@@ -15,7 +15,7 @@
 //   kind : base | aura | equip | missing | absent | joy | star | room | move | care | gift | service | comfort | isolated | hysteria
 // =============================================================================
 
-import { AURAS, ITEMS, TYPES, CONFIG } from './data.js';
+import { AURAS, ITEMS, TYPES, TYPE_EMITS, CONFIG } from './data.js';
 import { neighborIds, occupancy, roomEquipEffects, isLuxuryRoom, starRequiredLevel, guestAuras, tal } from './model.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -169,9 +169,9 @@ export function moodOf(sat) {
   return 'good';
 }
 
-/** Types (débloqués) qui émettent une aura. */
+/** Types (débloqués) dont les Pokémon dégagent souvent une aura (c'est leur effet principal). */
 export function emittersOf(aura, level = 99) {
-  return Object.values(TYPES).filter((t) => t.auras.includes(aura) && t.unlock <= level).map((t) => t.name);
+  return Object.values(TYPES).filter((t) => (TYPE_EMITS[t.id] || [])[0] === aura && t.unlock <= level).map((t) => t.name);
 }
 
 /** Comment obtenir une aura : voisin d'un type, ou équipement. */
@@ -179,7 +179,7 @@ function howToGet(aura, level) {
   if (aura === 'voisinage') return 'installez quelqu\'un à côté de lui (ou un Nounours câlin)';
   const names = emittersOf(aura, level);
   const item = Object.values(ITEMS).find((i) => i.auras && i.auras.length === 1 && i.auras[0] === aura);
-  const who = names.length ? `un voisin ${names.join(' ou ')}` : '';
+  const who = `un voisin qui en dégage${names.length ? ` (souvent ${names.join(' ou ')})` : ''}`;
   return [who, item ? `un ${item.name}` : ''].filter(Boolean).join(' ou ');
 }
 
@@ -202,7 +202,7 @@ export function adviceFor(state, guest) {
     for (const l of sat.lines) if (l.kind === 'hysteria') out.push({ tone: 'bad', text: `${l.source} hurle dans l'hôtel (−3) : calmez-le.` });
   } else {
     for (const a of guest.likes) out.push({ tone: 'tip', text: `Il veut : ${AURAS[a].name} — ${howToGet(a, state.hotel.level)} (+2 pour chaque voisin ou objet qui en apporte, −3 s'il n'y en a aucun).` });
-    for (const a of guest.dislikes) out.push({ tone: 'bad', text: `Il déteste : ${AURAS[a].name} — évitez ${a === 'voisinage' ? 'de lui donner des voisins' : `les voisins ${emittersOf(a, state.hotel.level).join(' ou ') || '(aucun type pour l\'instant)'}`} (−3 pour chaque voisin qui en apporte, +2 s'il n'y en a aucun).` });
+    for (const a of guest.dislikes) out.push({ tone: 'bad', text: `Il déteste : ${AURAS[a].name} — évitez ${a === 'voisinage' ? 'de lui donner des voisins' : 'les voisins qui en dégagent (voyez leur fiche)'} (−3 pour chaque voisin qui en apporte, +2 s'il n'y en a aucun).` });
   }
   const t = TYPES[guest.type];
   out.push({ tone: 'tip', text: `Particularité « ${t.trait.name} » : ${t.trait.desc}` });

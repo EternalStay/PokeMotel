@@ -18,6 +18,7 @@ import {
   placeGuest, moveGuest, fulfillRequest, hireStaff, assignStaff, recallStaff, buyItem, useItem, removeEquip,
   collectLeftover, buildRoom, demolishRoom, upgradeRoom, upgradeLobby, extendRoom, renameHotel,
   ALL_ACTIONS, dispatch, restartHotel, setNeon, NEON_COLORS, DEFAULT_NEON, setManager, renameStaff, receiveParcel, CUSTOM_START_MONEY,
+  SPECIES, NATURES, TYPE_EMITS, EXTRA_TYPES, DUAL_TYPE_LEVEL, EMIT_PHRASES, typeName, guestAuras,
   ACHIEVEMENTS, ACHIEVEMENT_KEYS, REWARDS, goalCount, totalPoints, nextReward, rewardName, titled, setTitle, WELL_TREATED,
 } from '../engine/index.js';
 import { LocalStore, prefs } from './storage.js';
@@ -801,7 +802,7 @@ const auraTag = (a) => `<i class="tchip">${auraIcon(a)}${AURAS[a].name}</i>`;
 
 /** Profil compact d'un client : ce qu'il aime, ce qu'il déteste, ce qu'il émet (en toutes lettres). */
 function traitsHTML(g, { emit = true } = {}) {
-  const emits = TYPES[g.type].auras;
+  const emits = guestAuras(g);
   const row = (cls, ico, label, list, empty) => `<span class="qrow ${cls}"><span class="qlabel">${icon(ico)}${label}</span>
     <span class="qtags">${list.length ? list.map(auraTag).join('') : `<i class="tchip none">${empty}</i>`}</span></span>`;
   return `<span class="qrows">${row('like', 'heart', 'Aime', g.likes, 'rien')}${row('dislike', 'close', 'Déteste', g.dislikes, 'rien')}${emit ? row('emit', 'bubble', 'Dégage', emits, 'rien (invisible)') : ''}</span>`;
@@ -814,8 +815,9 @@ function likeSentence(g) {
   if (g.likes.length) s += `Il aime ${names(g.likes)}`;
   if (g.dislikes.length) s += `${s ? ', mais il' : 'Il'} déteste ${names(g.dislikes)}`;
   s += s ? '. ' : '';
-  const em = TYPES[g.type].auras;
-  s += em.length ? `Il dégage ${names(em)} autour de lui.` : 'Il ne dégage rien autour de lui.';
+  const em = guestAuras(g);
+  const who = g.species && SPECIES[g.species] ? SPECIES[g.species].name : 'Il';
+  s += em.length ? `${who} ${em.map((a) => EMIT_PHRASES[a] || `dégage ${AURAS[a].name.toLowerCase()}`).join(' et ')}.` : `${who} ne dégage rien autour de lui.`;
   return s;
 }
 
@@ -838,7 +840,7 @@ function renderQueue() {
       <span class="qhead"><span class="qavatar">${creatureSVG(g, 'good')}</span>
         <span class="qid"><b>${esc(g.name)}${g.star ? ` ${icon('star')}` : ''}</b>
           <span class="qmeta"><i class="qtype" style="--c:${t.color};--d:${t.dark}">${t.name}</i><i class="qstay">${icon('moon')}${g.stay}</i>
-            <i class="qemit" title="Ce qu’il dégage autour de lui">${icon('bubble')}${t.auras.length ? t.auras.map((a) => auraIcon(a)).join('') : 'rien'}</i></span></span></span>
+            <i class="qemit" title="Ce qu’il dégage autour de lui">${icon('bubble')}${guestAuras(g).length ? guestAuras(g).map((a) => auraIcon(a)).join('') : 'rien'}</i></span></span></span>
       ${traitsHTML(g, { emit: false })}
     </button>`;
   }).join('');
@@ -1177,6 +1179,9 @@ function satGauge(v) {
 }
 
 // --- Fiche client -----------------------------------------------------------
+/** Types de l'espèce d'un client (le premier est celui de son comportement). */
+const speciesTypes = (g) => (g.species && SPECIES[g.species] ? SPECIES[g.species].types : [g.type]);
+
 function openGuest(guestId) {
   const g = state.guests[guestId];
   if (!g) return;
@@ -1192,7 +1197,8 @@ function openGuest(guestId) {
     <div class="fact-grid">
       <div class="fact like"><small>Aime</small>${g.likes.length ? g.likes.map((a) => `<b>${auraIcon(a)} ${AURAS[a].name}</b>`).join('') : '<b>rien de spécial</b>'}</div>
       <div class="fact dislike"><small>Déteste</small>${g.dislikes.length ? g.dislikes.map((a) => `<b>${auraIcon(a)} ${AURAS[a].name}</b>`).join('') : '<b>rien de spécial</b>'}</div>
-      <div class="fact"><small>Dégage autour de lui</small><b>${t.auras.length ? t.auras.map((a) => `${auraIcon(a)} ${AURAS[a].name}`).join(' ') : 'rien'}</b></div>
+      <div class="fact"><small>Dégage autour de lui</small>${guestAuras(g).length ? guestAuras(g).map((a) => `<b>${auraIcon(a)} ${AURAS[a].name}</b>`).join('') : '<b>rien</b>'}</div>
+      ${g.nature ? `<div class="fact nature"><small>Nature</small><b>${NATURES[g.nature].name}</b></div>` : ''}
       <div class="fact"><small>Séjour</small><b>${g.roomId ? `${g.nightsLeft} / ${g.stay} nuit(s)` : `${g.stay} nuit(s)`}</b></div>
     </div>
     <div class="trait-card" style="--c:${t.color}"><b>${t.trait.name}</b><span>${esc(t.trait.desc)}</span></div>
@@ -1225,7 +1231,7 @@ function openGuest(guestId) {
     cls: 'guest-sheet',
     hero: `<div class="hero-card type-${g.type}" style="--c:${t.color};--d:${t.dark}">
       <div class="hero-creature">${creatureSVG(g, mood)}</div>
-      <div class="hero-meta"><span class="type-chip">${t.icon} ${t.name}</span>${room ? `<span class="type-chip ghost">Chambre ${roomLabel(room)}</span>` : '<span class="type-chip ghost">En attente</span>'}</div>
+      <div class="hero-meta">${speciesTypes(g).map((id) => `<span class="type-chip">${(TYPES[id] || EXTRA_TYPES[id]).icon} ${typeName(id)}</span>`).join('')}${room ? `<span class="type-chip ghost">Chambre ${roomLabel(room)}</span>` : '<span class="type-chip ghost">En attente</span>'}</div>
     </div>`,
     kicker: g.star ? '★ Star' : g.parcel ? `🥚 Œuf de ${esc(g.parcel.from)}` : 'Client',
     title: esc(g.name),
@@ -1871,7 +1877,7 @@ function openHelp() {
   const chart = TYPE_IDS.map((id) => {
     const t = TYPES[id];
     return `<div class="type-row" style="--c:${t.color}"><div class="type-mini">${creatureSVG({ type: id, look: 3 }, 'good')}</div>
-      <div><b>${t.name}</b><small class="type-emit">Dégage ${t.auras.length ? t.auras.map((a) => `${auraIcon(a)} ${AURAS[a].name}`).join(' + ') : 'rien'} · dès le niveau ${t.unlock}</small><small><i>${t.trait.name}</i> : ${esc(t.trait.desc)}</small></div></div>`;
+      <div><b>${t.name}</b><small class="type-emit">${TYPE_EMITS[id].length ? `${id === 'plante' ? 'Dégage deux choses parmi' : 'Peut dégager'} ${TYPE_EMITS[id].map((a) => `${auraIcon(a)} ${AURAS[a].name}`).join(', ')}` : 'Ne dégage rien'} · dès le niveau ${t.unlock}</small><small><i>${t.trait.name}</i> : ${esc(t.trait.desc)}</small></div></div>`;
   }).join('');
   openSheet({
     cls: 'tall',
@@ -1880,8 +1886,8 @@ function openHelp() {
     body: `
       <ol class="steps">
         <li><b>Installez les clients</b> qui attendent devant l'hôtel : touchez-en un, puis une chambre. Chaque chambre affiche alors la note sur 10 qu'aurait le client s'il y dormait.</li>
-        <li><b>Chaque Pokémon dégage quelque chose</b> selon son type (de la chaleur, de l'humidité, des odeurs, du froid, du bruit…). Ses voisins directs le ressentent : à gauche, à droite, au-dessus et en dessous. Avoir un voisin tient aussi <b>compagnie</b>. On ne ressent jamais ce qu'on dégage soi-même.</li>
-        <li><b>Chaque client a 2 goûts</b> : des choses qu'il aime ou qu'il déteste. Il arrive avec une note de 3. Ce qu'il aime lui donne <b>+2 par voisin ou objet qui en apporte</b>, mais <b>−3 s'il n'en a pas du tout</b>. Ce qu'il déteste lui coûte <b>−3 par voisin qui en apporte</b>, mais lui donne <b>+2 s'il n'y en a pas</b>.</li>
+        <li><b>Chaque Pokémon dégage quelque chose</b> (de la chaleur, de l'humidité, des odeurs, du froid, du bruit…). Ça dépend de lui, pas seulement de son type : deux Ponyta ne dégagent pas forcément la même chose, regardez sa fiche. À partir du niveau ${DUAL_TYPE_LEVEL}, les Pokémon à double type dégagent deux choses. Ses voisins directs le ressentent : à gauche, à droite, au-dessus et en dessous. Avoir un voisin tient aussi <b>compagnie</b>. On ne ressent jamais ce qu'on dégage soi-même.</li>
+        <li><b>Ses goûts viennent de sa nature</b>, comme dans les jeux Pokémon : un Pokémon Timide aime la chaleur et déteste le bruit, un Brave aime le bruit et déteste la chaleur… Les natures neutres (Hardi, Docile…) aiment simplement la compagnie. Il arrive avec une note de 3. Ce qu'il aime lui donne <b>+2 par voisin ou objet qui en apporte</b>, mais <b>−3 s'il n'en a pas du tout</b>. Ce qu'il déteste lui coûte <b>−3 par voisin qui en apporte</b>, mais lui donne <b>+2 s'il n'y en a pas</b>.</li>
         <li><b>Chaque client paie deux fois</b>, selon sa note (jusqu'à 50 🪙 s'il est à 10/10) : à minuit, puis en partant à <b>10h</b>. Le changer de chambre lui fait perdre 2 points (une seule fois). Personne n'arrive entre minuit et ${CONFIG.wakeUpHour}h. Sans employé à la réception, un client arrive toutes les 8 h.</li>
         <li><b>${GEMS} Les ${GEMS_NAME.toLowerCase()}</b> se gagnent en jouant : missions (10 à la fin du tutoriel, puis 5), clients ravis (1, ou 2 à 5 pour une Star), taxe payée (10 × niveau). Elles servent à la Boutique, à recruter au-delà du 4e employé, à « Attirer un client » et à remettre les talents à zéro.</li>
         <li><b>La caisse démarre vide</b> : jusqu'au niveau 3, le Consortium (l'organisme qui prélève la taxe) la remet à 300 🪙 chaque nuit où elle descend sous 100.</li>
@@ -1899,7 +1905,7 @@ function openHelp() {
         <li><span class="request ok static"><span class="req-icon">🍰</span><span class="req-state">${icon('check')}</span></span> Le client demande un service : coche = touchez la bulle pour le servir, horloge = la salle est occupée, cadenas = la salle n'est pas encore construite.</li>
         <li><span class="best static">${icon('star')}Top</span> Pendant que vous installez un client : la meilleure chambre pour lui.</li>
       </ul>
-      <h3>Les types</h3><div class="type-list">${chart}</div>`,
+      <h3>Les types</h3><p class="muted">Le type décide du comportement (Pyromane, Radin…) et de ce qu'un Pokémon peut dégager. Acier, Sol et Fée n'existent qu'en second type : ils ajoutent seulement ce qu'ils dégagent (Acier : froid ou bruit, Sol : odeurs ou bruit, Fée : chaleur ou odeurs).</p><div class="type-list">${chart}</div>`,
     actions: [{ label: 'C\'est parti !', cls: 'primary', run: closeSheet }],
   });
   if (prefs.get('lastSeenLog', 0) === 0) prefs.set('lastSeenLog', Math.max(1, state.logSeq));

@@ -5,12 +5,12 @@
 // =============================================================================
 
 import {
-  TYPES, TYPE_IDS, CONFIG, NAME_PARTS, STAFF_NAMES, HOTEL_NAMES, SERVICE_IDS, ITEMS, BUILDABLES, STARTERS, tastePool,
+  TYPES, TYPE_IDS, CONFIG, SPECIES, SPECIES_IDS, NATURES, NATURE_IDS, TYPE_EMITS, DUAL_TYPE_LEVEL, STAFF_NAMES, HOTEL_NAMES, SERVICE_IDS, ITEMS, BUILDABLES, STARTERS, tastePool,
 } from './data.js';
 import { rngFor, makeSeed } from './rng.js';
 import { nextLocalHour, isNightTime, zonedParts, MINUTE, HOUR } from './time.js';
 
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 const DAY = 24 * HOUR;
 
 export const roomId = (floor, col) => `${floor}-${col}`;
@@ -150,6 +150,18 @@ export function migrate(state) {
       delete p.roomId; delete p.fx; delete p.fy;
     }
     state.v = 9;
+  }
+  if (state.v === 9) {
+    // v10 : espèces et natures. Les clients déjà là gardent ce qu'ils dégagent et
+    // leurs goûts ; ils reçoivent juste l'espèce qui correspond à leur dessin.
+    for (const g of Object.values(state.guests)) {
+      if (g.species) continue;
+      const list = speciesOfType(g.type);
+      g.species = list.length ? list[Math.abs(g.look || 0) % list.length].id : null;
+      g.emits = [...(TYPES[g.type]?.auras || [])];
+      g.nature = null;
+    }
+    state.v = 10;
   }
   return state.v === SAVE_VERSION ? state : null;
 }
@@ -311,20 +323,52 @@ export function departureTime(from, nights) {
   return nextLocalHour(t, CONFIG.checkoutHour, CONFIG.timeZone);
 }
 
-/** Auras émises par un client. */
-export const guestAuras = (g) => TYPES[g.type].auras;
+/** Ce que dégage un client (tiré à son arrivée ; anciens clients : selon leur type). */
+export const guestAuras = (g) => g.emits || TYPES[g.type].auras;
+
+/** Espèces dont le premier type (celui du comportement) est `type`. */
+export const speciesOfType = (type) => SPECIES_IDS.filter((id) => SPECIES[id].types[0] === type).map((id) => SPECIES[id]);
+
+/** Tirage pondéré : le premier élément d'une liste est le plus fréquent. */
+function pickEmit(rng, pool, exclude = []) {
+  const list = pool.filter((a) => !exclude.includes(a));
+  if (!list.length) return null;
+  return rng.weighted(list.map((id, i) => ({ id, weight: i === 0 && pool[0] === id ? 3 : 1 }))).id;
+}
+
+/**
+ * Ce que dégage un nouveau client, selon les types de son espèce :
+ * Spectre (Invisible) rien, Plante (Monstro-plante) deux choses de sa liste,
+ * sinon une chose de son premier type, plus une de son second type à partir
+ * du niveau DUAL_TYPE_LEVEL. Au début, seulement ce que les goûts connaissent déjà.
+ */
+export function drawEmits(rng, species, level) {
+  const [t1, t2] = species.types;
+  if (t1 === 'spectre') return [];
+  const known = tastePool(level);
+  const usable = (t) => { const p = TYPE_EMITS[t] || []; const k = p.filter((a) => known.includes(a)); return k.length ? k : p; };
+  if (t1 === 'plante') {
+    const a = pickEmit(rng, usable('plante'));
+    const b = pickEmit(rng, usable('plante'), [a]);
+    return [a, b].filter(Boolean);
+  }
+  const out = [pickEmit(rng, usable(t1))].filter(Boolean);
+  if (t2 && level >= DUAL_TYPE_LEVEL) {
+    const b = pickEmit(rng, usable(t2), out);
+    if (b) out.push(b);
+  }
+  return out;
+}
+
+/** Natures possibles à ce niveau : leurs goûts doivent être déjà connus. */
+export function naturesFor(level) {
+  const known = [...tastePool(level), 'voisinage'];
+  return NATURE_IDS.filter((id) => known.includes(NATURES[id].like) && (!NATURES[id].dislike || known.includes(NATURES[id].dislike)));
+}
 
 // -----------------------------------------------------------------------------
 // Clients
 // -----------------------------------------------------------------------------
-
-/** Tire `n` éléments distincts d'une liste (sans remise). */
-function drawFrom(rng, pool, n) {
-  const p = [...pool];
-  const out = [];
-  for (let i = 0; i < n && p.length; i++) out.push(p.splice(Math.floor(rng.next() * p.length), 1)[0]);
-  return out;
-}
 
 /** Génère un nouveau client (sans le placer). `forceType` : type imposé (Psy qui en attire un autre). */
 export function generateGuest(state, now, forceType = null) {
@@ -335,30 +379,44 @@ export function generateGuest(state, now, forceType = null) {
   let likes;
   let dislikes;
 
+  let species;
+  let emits;
+  let nature = null;
   if (index < STARTERS.length) {
-    ({ type, likes, dislikes } = STARTERS[index]);
-    likes = [...likes];
-    dislikes = [...dislikes];
+    const st = STARTERS[index];
+    ({ type } = st);
+    species = SPECIES[st.species];
+    emits = [...st.emits];
+    likes = [...st.likes];
+    dislikes = [...st.dislikes];
   } else {
-    const types = TYPE_IDS.filter((id) => TYPES[id].unlock <= level);
+    const types = TYPE_IDS.filter((id) => TYPES[id].unlock <= level && speciesOfType(id).length);
     type = forceType || rng.weighted(types.map((id) => ({ id, weight: TYPES[id].weight }))).id;
-    // Toujours 2 goûts en tout, répartis au hasard entre "aime" et "déteste".
-    const pool = tastePool(level);
-    const nLike = rng.int(0, 2);
-    const drawn = drawFrom(rng, pool, 2);
-    likes = drawn.slice(0, nLike);
-    dislikes = drawn.slice(nLike);
+    // Espèce : avant le niveau des doubles types, on préfère les espèces à un seul type.
+    const all = speciesOfType(type);
+    const single = all.filter((sp) => sp.types.length === 1);
+    species = rng.pick(level < DUAL_TYPE_LEVEL && single.length ? single : all);
+    emits = drawEmits(rng, species, level);
+    // Goûts : ceux de sa nature (neutre = aime la compagnie).
+    const natures = naturesFor(level);
+    const neutral = natures.filter((id) => !NATURES[id].dislike);
+    const marked = natures.filter((id) => NATURES[id].dislike);
+    nature = rng.chance(0.15) && neutral.length ? rng.pick(neutral) : rng.pick(marked.length ? marked : natures);
+    likes = [NATURES[nature].like];
+    dislikes = NATURES[nature].dislike ? [NATURES[nature].dislike] : [];
   }
 
   const w = CONFIG.stayWeights(level);
   const stay = rng.weighted(w.map((weight, i) => ({ id: i + 1, weight })).filter((x) => x.weight > 0)).id;
   const star = index >= STARTERS.length && rng.chance(CONFIG.vipChance);
-  const parts = NAME_PARTS[type];
 
   const guest = {
     id: `g${state.nextGuestId++}`,
-    name: rng.pick(parts.pre) + rng.pick(parts.suf),
+    name: nature ? `${species.name} ${NATURES[nature].name}` : species.name,
     type,
+    species: species.id,
+    nature,
+    emits,
     look: rng.int(0, 999),
     star,
     baseSat: (star ? CONFIG.vipBase : CONFIG.baseSat) + tal(state, MASTERY_BASE[type] || '_'),

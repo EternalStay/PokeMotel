@@ -4,7 +4,7 @@
 // voisinage, conseils. Tout est dérivé du détail structuré de la satisfaction.
 // =============================================================================
 
-import { AURAS, TYPES, ITEMS, SERVICES, BUILDABLES, neighborIds, occupancy, roomEquipEffects } from '../engine/index.js';
+import { AURAS, TYPES, ITEMS, SERVICES, BUILDABLES, neighborIds, occupancy, roomEquipEffects, guestAuras } from '../engine/index.js';
 import { auraIcon, factorIcon, dirIcon, faceIcon, icon } from './icons.js';
 import { creatureSVG } from './art.js';
 
@@ -129,7 +129,7 @@ export function neighborhoodHTML(state, guest, detail) {
     const iso = roomEquipEffects(r).isolate;
     return `<div class="nb nb-${dir} ${total > 0 ? 'pos' : total < 0 ? 'neg' : 'zero'}">
       <div class="nb-av">${creatureSVG(n, 'good')}</div>
-      <div class="nb-info"><b>${esc(n.name)}</b><span>${iso ? 'isolé' : t.auras.length ? t.auras.map((a) => auraIcon(a)).join('') : 'invisible'}</span></div>
+      <div class="nb-info"><b>${esc(n.name)}</b><span>${iso ? 'isolé' : guestAuras(n).length ? guestAuras(n).map((a) => auraIcon(a)).join('') : 'invisible'}</span></div>
       <em>${total === 0 ? '0' : sign(total)}</em>
     </div>`;
   };
@@ -156,7 +156,7 @@ export function ambianceHTML(state, room) {
   for (const id of neighborIds(state, room.id)) {
     const n = occ[id];
     if (!n || n.type === 'spectre' || roomEquipEffects(state.rooms[id]).isolate) continue;
-    for (const a of TYPES[n.type].auras) incoming.push({ n, aura: a });
+    for (const a of guestAuras(n)) incoming.push({ n, aura: a });
     incoming.push({ n, aura: 'voisinage' });
   }
   for (const id of room.equip) for (const a of (ITEMS_CACHE[id] || [])) incoming.push({ n: null, aura: a, item: id });
