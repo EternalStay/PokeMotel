@@ -398,7 +398,7 @@ body:is([data-phase="night"], [data-phase="evening"]) .kind-empty .room-art { fi
 .qlikes .like { background: #d9f5df; }
 .qlikes .dislike { background: #fde0e0; }
 
-.tabbar { display: grid; grid-template-columns: repeat(5, 1fr); padding: 2px 6px 0; }
+.tabbar { display: grid; grid-template-columns: repeat(6, 1fr); padding: 2px 6px 0; }
 .tab {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px;
   padding: 6px 2px 4px; border-radius: 12px; color: #d9d0fb; font-size: 11px; font-weight: 600;
@@ -1150,7 +1150,7 @@ body:is([data-phase="evening"], [data-phase="night"]) .birds { display: none; }
     padding: 0 12px 10px; overflow-y: auto; min-height: 0;
   }
   #quest { display: none !important; }
-  .tabbar { grid-template-columns: repeat(5, auto); justify-content: center; gap: 24px; }
+  .tabbar { grid-template-columns: repeat(6, auto); justify-content: center; gap: 24px; }
   .tab { flex-direction: row; gap: 6px; font-size: 14px; padding: 6px 12px; }
   .queue { padding-bottom: 6px; }
   .sheet { bottom: auto; top: 50%; transform: translateY(-50%); border-radius: 22px; border-bottom: 3px solid var(--brass); animation: none; }
@@ -1685,7 +1685,6 @@ body:is([data-phase="evening"], [data-phase="night"], [data-phase="dusk"]) .lamp
 @media (prefers-reduced-motion: reduce) { .fly-coin, .hud-pop { display: none; } }
 
 /* --- Social : onglet Amis, classement, visite, mur ----------------------------------- */
-.tabbar { grid-template-columns: repeat(6, 1fr); }
 .code-card { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; padding: 10px 12px; border-radius: 16px;
   background: linear-gradient(#fff8dc, #f6e3a8); box-shadow: inset 0 0 0 2px #e8cf86; }
 .code-card > div { flex: 1 1 140px; display: flex; flex-direction: column; }

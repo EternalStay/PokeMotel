@@ -2,7 +2,7 @@
 // Service worker : met en cache l'application (et les polices) pour qu'elle
 // s'ouvre hors-ligne. Pensez à incrémenter VERSION à chaque mise à jour.
 // =============================================================================
-const VERSION = 'pokemotel-v0.14.0';
+const VERSION = 'pokemotel-v0.14.1';
 
 const APP_SHELL = [
   './',
@@ -43,7 +43,11 @@ const APP_SHELL = [
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
+  // `reload` : on va chercher les fichiers sur le serveur, jamais dans le cache HTTP du navigateur
+  // (sinon une nouvelle version pourrait s'installer avec d'anciens fichiers).
+  event.waitUntil(caches.open(VERSION)
+    .then((cache) => cache.addAll(APP_SHELL.map((u) => new Request(u, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
@@ -71,8 +75,11 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== location.origin) return;
 
   // Application : réseau d'abord (mises à jour), cache en secours hors-ligne.
+  // `no-cache` : le navigateur revérifie chaque fichier auprès du serveur (réponse 304 si
+  // inchangé). Sans ça, GitHub Pages autorise 10 min de cache : une page neuve pouvait
+  // tourner avec l'ancien style.css / main.js (6e onglet à la ligne, bouton Amis inactif).
   event.respondWith(
-    fetch(req)
+    fetch(req, { cache: 'no-cache' })
       .then((res) => {
         const copy = res.clone();
         caches.open(VERSION).then((cache) => cache.put(req, copy));
