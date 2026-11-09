@@ -86,6 +86,30 @@ const fmtCountdown = (ms) => {
 };
 const clock = (t) => formatClock(t, CONFIG.timeZone);
 
+/**
+ * Soleil (6h → 21h) et lune (21h → 6h) : ils traversent le ciel en arc de cercle,
+ * de gauche à droite, au fil de l'heure de l'hôtel.
+ */
+function placeCelestial(t) {
+  const sky = $('#sky');
+  let el = $('#celestial');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'celestial';
+    sky.appendChild(el);
+  } else if (el.nextElementSibling) sky.appendChild(el); // toujours devant les ciels en fondu
+  const p = zonedParts(t, CONFIG.timeZone);
+  const h = p.h + p.min / 60;
+  const day = h >= 6 && h < 21;
+  const f = day ? (h - 6) / 15 : ((h - 21 + 24) % 24) / 9; // 0 = lever (à gauche), 1 = coucher (à droite)
+  const arc = Math.sin(Math.PI * f);                        // 0 à l'horizon, 1 au plus haut
+  el.className = day ? 'sun' : 'moon';
+  el.style.left = `${6 + f * 88}%`;
+  el.style.top = `${62 - arc * 38}%`; // au plus haut, juste sous la barre d'actions
+  // Le soleil rougit près de l'horizon.
+  if (day) el.style.setProperty('--warm', (1 - Math.min(1, arc * 1.6)).toFixed(2));
+}
+
 function phaseOf(t) {
   const h = zonedParts(t, CONFIG.timeZone).h;
   if (h < 6) return 'night';
@@ -234,6 +258,7 @@ function render() {
     document.body.dataset.phase = p;
     layoutKey = ''; // la rue et les lampadaires changent avec la phase
   }
+  placeCelestial(t);
   const occ = occupancy(state);
   const details = {};
   const sats = {};

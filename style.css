@@ -1756,3 +1756,17 @@ body.visiting .tab:not(#tab-friends) { opacity: .35; pointer-events: none; }
   .hud-res .res.clock-chip .ico { display: none; }
   .hud-res .res.clock-chip { padding-left: 9px; }
 }
+
+/* --- Soleil et lune : arc de cercle au fil de la journée (placeCelestial) -------- */
+#celestial { position: absolute; z-index: 2; width: 74px; height: 74px; margin: -37px 0 0 -37px; border-radius: 50%; pointer-events: none;
+  transition: left 1.5s linear, top 1.5s linear, background-color 4s, box-shadow 4s; }
+#celestial.sun {
+  --warm: 0;
+  background: color-mix(in srgb, #fff6c4 calc((1 - var(--warm)) * 100%), #ff9a4a);
+  box-shadow: 0 0 0 14px color-mix(in srgb, #fff6c4 28%, transparent), 0 0 60px 26px color-mix(in srgb, #ffe8a0 calc((1 - var(--warm)) * 45%), #ff8a3d 35%);
+}
+#celestial.moon {
+  width: 58px; height: 58px; margin: -29px 0 0 -29px;
+  background: transparent; box-shadow: inset -16px 7px 0 0 #fdf6d8, 0 0 34px 4px #fdf6d84d;
+  transform: rotate(-18deg);
+}

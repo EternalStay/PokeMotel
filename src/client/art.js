@@ -621,9 +621,7 @@ export function skySVG(phase) {
     const x = (i * 97) % W; const y = (i * 53) % 520; const r = (i % 3) * 0.5 + 0.7;
     return `<circle class="twinkle" style="animation-delay:${(i % 7) * 0.6}s" cx="${x}" cy="${y}" r="${r}" fill="#fff"/>`;
   }).join('') : '';
-  const sun = phase === 'day' ? '<circle cx="1280" cy="150" r="56" fill="#fff6c4"/><circle cx="1280" cy="150" r="90" fill="#fff6c4" opacity=".25"/>'
-    : dark ? `<circle cx="1260" cy="140" r="40" fill="#fdf6d8"/><circle cx="1278" cy="126" r="36" fill="${sky[0]}"/>`
-    : '<circle cx="300" cy="640" r="70" fill="#ffd27a" opacity=".85"/>';
+  const sun = ''; // soleil et lune : #celestial, qui suit l'heure (voir main.js)
   const winLit = dark ? '#ffd86b' : '#9fb4cf';
   // Deux rangées d'immeubles (loin / près) générées de façon déterministe.
   const row = (seed, hMin, hMax, fill, op) => {
