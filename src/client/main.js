@@ -696,7 +696,7 @@ function roomView(room, t, occ, sats) {
       ${g.parcel ? '<span class="tag egg" title="Œuf d’un ami : ne paie pas">🥚</span>' : ''}
       ${g.bombAt ? `<span class="tag bomb">💥<span data-until="${g.bombAt}"></span></span>` : ''}</div>`;
     // Bas : pastilles "ce qui va / ne va pas".
-    if (!selection) html += chipsHTML(detail.lines, { max: 2 }); // les 2 plus fortes ; le reste dans la bulle et la fiche
+    if (!selection) html += chipsHTML(detail.lines, { max: Infinity }); // toutes les pastilles, sans « +n »
     if (g.request) {
       const svc = SERVICES[g.request.kind];
       const st = { ok: icon('check'), busy: icon('clock'), missing: icon('lock') }[reqStatus];
