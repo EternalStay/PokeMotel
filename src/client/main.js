@@ -132,7 +132,7 @@ async function boot() {
   else if (state.stats.nights > nightsBefore) openJournal('Pendant votre absence', lastSeenLog);
   else {
     const unread = state.log.filter((l) => l.id > lastSeenLog).length;
-    if (unread) toast(`${unread} nouvel${unread > 1 ? 's' : ''} événement${unread > 1 ? 's' : ''} dans le journal.`);
+    if (unread) toast(`${unread} nouvel${unread > 1 ? 's' : ''} événement${unread > 1 ? 's' : ''} : touchez l’horloge pour lire le journal.`);
   }
 }
 
@@ -954,7 +954,8 @@ function bindEvents() {
   $('#side').addEventListener('click', (e) => {
     if (e.target.closest('[data-side="attract"]') && act(attractGuest).ok) toast('Un client arrive !', 'good');
   });
-  $('#tab-journal').addEventListener('click', () => openJournal());
+  $('#journal-btn').addEventListener('click', () => openJournal());
+  $('#settings-btn').addEventListener('click', () => openSettings());
   $('#tab-shop').addEventListener('click', () => openShop());
   $('#tab-staff').addEventListener('click', openStaff);
   $('#tab-office').addEventListener('click', openOffice);
@@ -1665,11 +1666,6 @@ function openOffice({ keep = false } = {}) {
         <button class="ext-card" data-do="extend" ${!canExtend || state.money < ext ? 'disabled' : ''}>${icon('build')}<b>Ajouter un emplacement</b><small>${h.floors} / ${CONFIG.maxFloors} étages · ${h.cols} / ${CONFIG.maxCols} colonnes</small>${ext ? cur(ext) : '<small>Gratuit</small>'}</button>
       </div>
       <p class="muted">On agrandit case par case : à côté d'une pièce, ou sur le toit au-dessus d'une pièce. Le prix augmente avec la taille de l'hôtel ; au-delà de 9 pièces, chaque emplacement rapporte 1 ⭐.</p>
-      ${accountHTML()}
-      <a class="set-row privacy-row" href="confidentialite.html" target="_blank" rel="noopener"><small>Vos données</small><b>🔒 Règles de confidentialité</b>${icon('right')}</a>
-      <button class="set-row sound-row" data-do="sound"><small>Sons du jeu</small><b>${soundEnabled() ? '🔊 Activés' : '🔇 Coupés'}</b>${icon('right')}</button>
-      <button class="set-row sound-row" data-do="vibrate"><small>Vibrations</small><b>${prefs.get('vibrate', true) ? '📳 Activées' : '📴 Coupées'}</b>${icon('right')}</button>
-      <button class="set-row sound-row" data-do="reload"><small>Un souci d’affichage ?</small><b>🔄 Recharger le jeu</b>${icon('right')}</button>
       ${restartHTML()}
       <h3>${icon('bell')} Publicité du jour</h3>
       ${h.level < 2 ? `<p class="muted">Les sponsors ne s’intéressent qu’aux hôtels de niveau 2 et plus : payez votre première taxe !</p>` : `<p class="muted">Chaque jour, de nouveaux sponsors proposent de vous envoyer des clients. Ils arrivent au réveil, à ${CONFIG.wakeUpHour}h.</p>
@@ -1691,7 +1687,7 @@ function openOffice({ keep = false } = {}) {
       </div>`,
     actions: [
       { label: `${icon('star')} Succès`, run: openAchievements },
-      { label: `${icon('help')} Aide`, run: openHelp },
+
     ],
   });
   onSheetClick({
@@ -1701,16 +1697,35 @@ function openOffice({ keep = false } = {}) {
       `Votre hôtel actuel sera définitivement perdu. ${custom === '1' ? `Vous repartirez avec l’accueil seul et ${CUSTOM_START_MONEY} ${CURRENCY} pour bâtir vous-même vos pièces.` : 'Vous repartirez avec un hôtel neuf de 6 chambres.'} Vos gemmes vous suivent.`, () => resetGame(custom === '1')),
     rename: () => { rememberOffice(); openRename(); },
     manager: () => { rememberOffice(); openManager(); },
-    login: openLogin,
-    logout: () => confirmSheet('Se déconnecter ?', 'Votre hôtel reste enregistré sur votre compte. Sur cet appareil, vous repartirez d’une partie locale.', () => signOut()),
-    sound: () => { rememberOffice(); const on = !soundEnabled(); setSoundEnabled(on); prefs.set('sound', on); if (on) sfx('done', 3); backToOffice(); },
     neon: (i) => { rememberOffice(); if (act(setNeon, Number(i)).ok) backToOffice(); },
-    reload: () => location.reload(),
-    vibrate: () => { rememberOffice(); const on = !prefs.get('vibrate', true); prefs.set('vibrate', on); if (on) buzz(20); backToOffice(); },
     goals: openAchievements,
     legacy: () => confirmSheet('Léguer votre hôtel ?', `Vous repartirez au niveau ${LEGACY.restartLevel} avec l'accueil seul. Vous gardez votre argent (+${LEGACY.compensation} 🪙), 1 employé et votre réserve ; les chambres, les clients, le mobilier et l'arbre de talents sont perdus. En échange : une étoile, +${LEGACY.fame} ⭐ et 5 points de talents de plus au maximum.`, () => act(bequeathHotel)),
   });
   if (keep) $('#sheet .sheet-body').scrollTop = officeY;
+}
+
+// --- Réglages (bouton ⚙️ en haut) : compte, sons, vibrations, aide ------------------
+function openSettings() {
+  openSheet({
+    kicker: 'PokéMotel',
+    title: 'Réglages',
+    body: `<div class="settings">
+      ${accountHTML()}
+      <button class="set-row" data-do="sound"><small>Sons du jeu</small><b>${soundEnabled() ? '🔊 Activés' : '🔇 Coupés'}</b>${icon('right')}</button>
+      <button class="set-row" data-do="vibrate"><small>Vibrations</small><b>${prefs.get('vibrate', true) ? '📳 Activées' : '📴 Coupées'}</b>${icon('right')}</button>
+      <button class="set-row" data-do="help"><small>Les règles du jeu</small><b>📖 Guide du directeur</b>${icon('right')}</button>
+      <button class="set-row" data-do="reload"><small>Un souci d’affichage ?</small><b>🔄 Recharger le jeu</b>${icon('right')}</button>
+      <a class="set-row privacy-row" href="confidentialite.html" target="_blank" rel="noopener"><small>Vos données</small><b>🔒 Règles de confidentialité</b>${icon('right')}</a>
+    </div>`,
+  });
+  onSheetClick({
+    login: openLogin,
+    logout: () => confirmSheet('Se déconnecter ?', 'Votre hôtel reste enregistré sur votre compte. Sur cet appareil, vous repartirez d’une partie locale.', () => signOut()),
+    sound: () => { const on = !soundEnabled(); setSoundEnabled(on); prefs.set('sound', on); if (on) sfx('done', 3); openSettings(); },
+    vibrate: () => { const on = !prefs.get('vibrate', true); prefs.set('vibrate', on); if (on) buzz(20); openSettings(); },
+    help: openHelp,
+    reload: () => location.reload(),
+  });
 }
 
 /** « Recommencer » : seulement jusqu'à la mission de la première nuit. */
@@ -1727,7 +1742,7 @@ const RENAME_QUEST = QUESTS.findIndex((q) => q.goals.includes('rename'));
 function settingsHTML() {
   if (state.questsDone < RENAME_QUEST && state.quest.id < RENAME_QUEST) return '';
   const cur = state.hotel.neon ?? DEFAULT_NEON;
-  return `<h3>${icon('build')} Réglages</h3>
+  return `<h3>${icon('build')} Personnaliser l’hôtel</h3>
     <div class="settings">
       <button class="set-row" data-do="rename"><small>Nom de l’hôtel</small><b>${esc(state.hotel.name)}</b>${icon('right')}</button>
       <button class="set-row" data-do="manager"><small>Gérant</small><b>${esc(titled(state, state.manager || 'Gérant'))}</b>${icon('right')}</button>
@@ -2712,7 +2727,7 @@ function handleInviteLink() {
   }
   if (code.length !== 8) return;
   prefs.set('pendingFriend', code);
-  if (!online) toast('Connectez-vous pour ajouter cet ami (Bureau › Jouer en ligne).');
+  if (!online) toast('Connectez-vous pour ajouter cet ami (⚙️ Réglages › Jouer en ligne).');
 }
 
 /** Ouvre la fenêtre Amis pour un lien d'invitation reçu, dès qu'aucune autre fenêtre n'attend. */

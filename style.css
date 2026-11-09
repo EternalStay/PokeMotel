@@ -398,7 +398,7 @@ body:is([data-phase="night"], [data-phase="evening"]) .kind-empty .room-art { fi
 .qlikes .like { background: #d9f5df; }
 .qlikes .dislike { background: #fde0e0; }
 
-.tabbar { display: grid; grid-template-columns: repeat(6, 1fr); padding: 2px 6px 0; }
+.tabbar { display: grid; grid-template-columns: repeat(5, 1fr); padding: 2px 6px 0; }
 .tab {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px;
   padding: 6px 2px 4px; border-radius: 12px; color: #d9d0fb; font-size: 11px; font-weight: 600;
@@ -1150,7 +1150,7 @@ body:is([data-phase="evening"], [data-phase="night"]) .birds { display: none; }
     padding: 0 12px 10px; overflow-y: auto; min-height: 0;
   }
   #quest { display: none !important; }
-  .tabbar { grid-template-columns: repeat(6, auto); justify-content: center; gap: 24px; }
+  .tabbar { grid-template-columns: repeat(5, auto); justify-content: center; gap: 24px; }
   .tab { flex-direction: row; gap: 6px; font-size: 14px; padding: 6px 12px; }
   .queue { padding-bottom: 6px; }
   .sheet { bottom: auto; top: 50%; transform: translateY(-50%); border-radius: 22px; border-bottom: 3px solid var(--brass); animation: none; }
@@ -1739,3 +1739,20 @@ body.visiting .tab:not(#tab-friends) { opacity: .35; pointer-events: none; }
 .w-del { color: var(--ink-2); padding: 2px; }
 .w-del .ico { width: 15px; height: 15px; }
 .wall-list p { margin: 3px 0 0; font-size: 14px; overflow-wrap: anywhere; }
+
+/* HUD : l'horloge ouvre le journal (pastille des nouveautés), ⚙️ ouvre les réglages. */
+#journal-btn { position: relative; color: inherit; cursor: pointer; }
+#journal-btn #clock { display: inline-flex; align-items: center; gap: 5px; }
+#journal-btn .badge { position: absolute; top: -6px; right: -8px; }
+.res.icon-chip { padding: 5px; width: 36px; justify-content: center; color: #fff; cursor: pointer; }
+.res.icon-chip .ico { width: 21px; height: 21px; }
+@media (max-width: 400px) {
+  .hud-res { gap: 4px; }
+  .hud-res .res { padding-left: 7px; padding-right: 7px; gap: 4px; }
+  .hud-res .res b { font-size: 14px; }
+  .hud-res .res .ico { width: 16px; height: 16px; }
+  .hud-res .res.icon-chip { width: 30px; padding: 4px; }
+  .hud-res .res.icon-chip .ico { width: 19px; height: 19px; }
+  .hud-res .res.clock-chip .ico { display: none; }
+  .hud-res .res.clock-chip { padding-left: 9px; }
+}
